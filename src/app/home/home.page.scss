@@ -1,27 +1,154 @@
-#container {
+/* ---------- Lienzo & fondo con gradientes sutiles ---------- */
+ion-content {
+  --background:
+    radial-gradient(1200px 800px at 10% 0%, rgba(var(--ion-color-primary-rgb), .10) 0%, transparent 60%),
+    radial-gradient(1000px 700px at 90% 20%, rgba(var(--ion-color-tertiary-rgb), .10) 0%, transparent 60%),
+    linear-gradient(180deg, var(--ion-background-color), var(--ion-background-color));
+}
+
+.page {
+  padding: 16px;
+  display: block;
+  animation: fadeIn .5s ease both;
+}
+
+/* ---------- Cards: glass + elevación ---------- */
+ion-card {
+  --background: color-mix(in srgb, var(--ion-background-color) 85%, transparent);
+  backdrop-filter: saturate(1.1) blur(8px);
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--ion-color-primary) 8%, transparent);
+  box-shadow: 0 10px 24px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+ion-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0,0,0,.10), 0 3px 8px rgba(0,0,0,.06);
+  border-color: color-mix(in srgb, var(--ion-color-primary) 16%, transparent);
+}
+
+/* ---------- Toolbar / Botón ---------- */
+ion-toolbar {
+  --background: linear-gradient(90deg, color-mix(in srgb, var(--ion-color-primary) 12%, transparent), transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ion-color-primary) 12%, transparent);
+}
+ion-button {
+  --border-radius: 14px;
+  --box-shadow: 0 8px 16px rgba(var(--ion-color-primary-rgb), .25);
+  transform: translateZ(0);
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+ion-button:hover { transform: translateY(-1px); }
+
+/* ---------- Dropzone ---------- */
+.dropzone {
+  position: relative;
+  border: 2px dashed color-mix(in srgb, var(--ion-color-primary) 45%, var(--ion-color-step-400));
+  border-radius: 16px;
+  padding: 28px;
   text-align: center;
+  background:
+    radial-gradient(200px 120px at 20% 20%, color-mix(in srgb, var(--ion-color-primary) 8%, transparent), transparent 70%),
+    radial-gradient(220px 140px at 80% 40%, color-mix(in srgb, var(--ion-color-tertiary) 8%, transparent), transparent 70%);
+  transition: border-color .2s ease, background-color .2s ease, transform .2s ease;
+}
+.dropzone:hover { transform: translateY(-1px); }
+.dropzone.dragging { border-color: var(--ion-color-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ion-color-primary) 20%, transparent); }
 
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+.dz-icon {
+  font-size: 40px;
+  color: var(--ion-color-primary);
+  filter: drop-shadow(0 6px 12px rgba(var(--ion-color-primary-rgb), .3));
+}
+.dropzone h3 { margin: 10px 0 6px; font-weight: 700; }
+.dropzone p { margin: 0; color: var(--ion-color-medium); }
+.dropzone .linklike {
+  background: none; border: none; color: var(--ion-color-primary);
+  text-decoration: underline; font-weight: 600; cursor: pointer; padding: 0;
 }
 
-#container strong {
-  font-size: 20px;
-  line-height: 26px;
+/* ---------- Filtros ---------- */
+.filters { gap: 12px; }
+.filters ion-item {
+  --background: transparent;
+  border: 1px solid color-mix(in srgb, var(--ion-color-primary) 12%, var(--ion-color-step-250));
+  border-radius: 14px; padding: 8px;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease;
+}
+.filters ion-item:focus-within {
+  border-color: var(--ion-color-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ion-color-primary) 18%, transparent);
+  transform: translateY(-1px);
 }
 
-#container p {
-  font-size: 16px;
-  line-height: 22px;
+/* Dropdowns en línea para fechas */
+.inline-selects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.inline-selects span { opacity: .5; }
 
-  color: #8c8c8c;
+/* ---------- KPIs ---------- */
+.kpi {
+  color: white;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ion-color-success) 80%, #000 0%), var(--ion-color-success-shade));
+  border: none;
+  box-shadow: 0 14px 26px rgba(var(--ion-color-success-rgb), .28);
+  position: relative; overflow: hidden;
+  animation: floatIn .45s ease both;
+}
+.kpi ion-card-subtitle { color: rgba(255,255,255,.85) !important; letter-spacing: .3px; }
+.kpi ion-card-title { font-size: 32px; font-weight: 800; }
 
-  margin: 0;
+.loaded .kpi { animation: shimmerIn 1s ease both; }
+.kpi::after {
+  content: ""; position: absolute; inset: -40%;
+  background: conic-gradient(from 180deg, transparent, rgba(255,255,255,.35), transparent 40%);
+  filter: blur(18px); transform: rotate(15deg); pointer-events: none;
+}
+.kpi:nth-child(2) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ion-color-primary) 82%, #000 0%), var(--ion-color-primary-shade));
+  box-shadow: 0 14px 26px rgba(var(--ion-color-primary-rgb), .28);
+}
+.kpi:nth-child(3) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ion-color-warning) 78%, #000 0%), var(--ion-color-warning-shade));
+  box-shadow: 0 14px 26px rgba(var(--ion-color-warning-rgb), .28);
+}
+.kpi:nth-child(4) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ion-color-danger) 78%, #000 0%), var(--ion-color-danger-shade));
+  box-shadow: 0 14px 26px rgba(var(--ion-color-danger-rgb), .28);
 }
 
-#container a {
-  text-decoration: none;
+/* ---------- Detalle ---------- */
+.row-detail { padding: 8px 12px; }
+ion-accordion ion-item[slot="header"] {
+  --background: color-mix(in srgb, var(--ion-background-color) 90%, transparent);
+  border-left: 4px solid var(--ion-color-primary);
+  transition: background-color .2s ease;
+}
+ion-accordion ion-item[slot="header"]:hover {
+  --background: color-mix(in srgb, var(--ion-color-primary) 8%, var(--ion-background-color));
+}
+
+/* ---------- PDF ---------- */
+#reportContainer { scroll-margin-top: 80px; background: var(--ion-color-step-50, #fff); border-radius: 16px; padding: 8px; }
+
+/* ---------- Tipos & helpers ---------- */
+.hint { margin-left: 8px; }
+apx-chart { display: block; }
+
+/* ---------- Animaciones ---------- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes floatIn {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes shimmerIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
