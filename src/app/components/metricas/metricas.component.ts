@@ -23,7 +23,7 @@ type Registro = {
   fechaReporte: Date | null;
   momento: string;
   totalCamaras: number;
-  operativasHoy: string;
+  operativasHoy: string;   // ya no se usa para cálculos (se mantiene por compatibilidad)
   camsConFalla: number;
   fallaTipo?: string;
   fallasGenerales?: string;
@@ -31,7 +31,7 @@ type Registro = {
 
 type Metrics = {
   totalCamaras: number;
-  operativasInterpretadas: number;
+  operativasInterpretadas: number; // ahora = total - conFalla (valor real, no estimado)
   camarasConFalla: number;
 };
 
@@ -46,6 +46,7 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
   @Input() filtered: Registro[] = [];
   @Output() metricsChange = new EventEmitter<Metrics>();
 
+  // Todas las métricas derivadas EXCLUSIVAMENTE de datos reales
   metrics: Metrics = { totalCamaras: 0, operativasInterpretadas: 0, camarasConFalla: 0 };
 
   @ViewChild('chartOperativas') chartOperativasRef!: ElementRef<HTMLCanvasElement>;
@@ -73,24 +74,31 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
     this.destroyCharts();
   }
 
+  // ============================
+  // CÁLCULO 100% BASADO EN DATOS
+  // ============================
   private computeMetrics() {
-    const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
-    const ratio = (s: string) => {
-      const v = (s || '').toLowerCase();
-      if (v === 'todas') return 1;
-      if (v.includes('mas de la mitad') || v.includes('más de la mitad')) return 0.7;
-      if (v.includes('menos de la mitad')) return 0.3;
-      if (v === 'no') return 0;
-      return 0.5;
-    };
+    let total = 0;
+    let conFalla = 0;
 
-    this.metrics.totalCamaras = sum(this.filtered.map(r => r.totalCamaras || 0));
-    this.metrics.camarasConFalla = sum(this.filtered.map(r => r.camsConFalla || 0));
-    this.metrics.operativasInterpretadas = sum(
-      this.filtered.map(r => Math.round((r.totalCamaras || 0) * ratio(r.operativasHoy || '')))
-    );
+    for (const r of this.filtered) {
+      const t = Number(r.totalCamaras) || 0;
+      const f = Number(r.camsConFalla) || 0;
+
+      total += t;
+      conFalla += Math.min(Math.max(f, 0), t); // clamp simple
+    }
+
+    const operativas = Math.max(total - conFalla, 0);
+
+    this.metrics.totalCamaras = total;
+    this.metrics.camarasConFalla = conFalla;
+    this.metrics.operativasInterpretadas = operativas; // valor real (no estimado)
   }
 
+  // ===============
+  // CHARTS / GRÁFICOS
+  // ===============
   private destroyCharts() {
     this.charts.forEach(c => c.destroy());
     this.charts = [];
@@ -111,17 +119,18 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
   private updateCharts() {
     this.destroyCharts();
 
-    // 1) Operativas vs Totales
+    // 1) Operativas vs Totales (valores REALES)
     const c1 = this.chartOperativasRef?.nativeElement?.getContext('2d');
     if (c1) {
       const total = Math.max(this.metrics.totalCamaras, 0);
-      const op = Math.min(this.metrics.operativasInterpretadas, total);
-      const noOp = Math.max(total - op, 0);
+      const conFalla = Math.min(this.metrics.camarasConFalla, total);
+      const operativas = Math.max(total - conFalla, 0);
+
       this.charts.push(new Chart(c1, {
         type: 'doughnut',
         data: {
-          labels: ['Operativas (aprox.)', 'No operativas (aprox.)'],
-          datasets: [{ data: [op, noOp] }]
+          labels: ['Operativas', 'No operativas'],
+          datasets: [{ data: [operativas, conFalla] }]
         },
         options: {
           ...this.getBaseOptions(),
@@ -141,7 +150,7 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
       }));
     }
 
-    // 2) Distribución por Momento
+    // 2) Distribución por Momento (conteo real de reportes)
     const repMomento: Record<string, number> = {};
     this.filtered.forEach(r => {
       repMomento[r.momento] = (repMomento[r.momento] || 0) + 1;
@@ -173,7 +182,7 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
       }));
     }
 
-    // 3) Reportes por Ubicación
+    // 3) Reportes por Ubicación (conteo real)
     const repUb: Record<string, number> = {};
     this.filtered.forEach(r => { repUb[r.ubicacion] = (repUb[r.ubicacion] || 0) + 1; });
     const pairsRepUb = Object.entries(repUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -190,9 +199,12 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
       }));
     }
 
-    // 4) Cámaras con Falla por Ubicación
+    // 4) Cámaras con Falla por Ubicación (suma real de `camsConFalla`)
     const fallaUb: Record<string, number> = {};
-    this.filtered.forEach(r => { fallaUb[r.ubicacion] = (fallaUb[r.ubicacion] || 0) + (r.camsConFalla || 0); });
+    this.filtered.forEach(r => {
+      const f = Number(r.camsConFalla) || 0;
+      fallaUb[r.ubicacion] = (fallaUb[r.ubicacion] || 0) + f;
+    });
     const pairsFallaUb = Object.entries(fallaUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
     const c4 = this.chartFallaUbicacionRef?.nativeElement?.getContext('2d');
