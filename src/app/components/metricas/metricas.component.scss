@@ -5,44 +5,51 @@
   --glass-border: rgba(0, 0, 0, 0.08);
 }
 
-/* ====== KPIs ====== */
+/* ====== KPIs (mejorados) ====== */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: clamp(10px, 1.4vw, 16px);
+  /* Las tarjetas se ajustan automáticamente, mínimo 220px */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
   margin-bottom: 8px;
 }
 
 .kpi {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0)) padding-box,
-    conic-gradient(from 180deg at 50% 0%, rgba(59,130,246,.12), rgba(34,211,238,.12), transparent) border-box;
-  border: 1px solid transparent;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: none;
 
-  grid-column: span 12;
-  @media (min-width: 540px) { grid-column: span 6; }
-  @media (min-width: 900px) { grid-column: span 3; }
+  ion-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+  }
 
   .kpi-title {
-    font-size: .82rem;
+    display: block;
+    font-size: 0.88rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: .02em;
+    line-height: 1.2;
     color: var(--muted);
-    margin-bottom: 6px;
+
+    /* evita cortes y asegura quiebre de texto */
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
+
   .kpi-value {
     font-weight: 800;
-    font-size: clamp(1.6rem, 3.2vw, 2.1rem);
-    color: var(--text);
+    font-size: clamp(1.6rem, 3.2vw, 2.2rem);
     line-height: 1.1;
-    animation: valuePulse 3.2s ease-in-out infinite;
+    color: var(--text);
   }
-}
-
-@keyframes valuePulse {
-  0%, 100% { filter: drop-shadow(0 0 0 rgba(59,130,246,0)); }
-  50%      { filter: drop-shadow(0 0 10px rgba(59,130,246,.25)); }
 }
 
 /* ====== Charts ====== */

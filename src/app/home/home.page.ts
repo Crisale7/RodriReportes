@@ -293,93 +293,83 @@ export class HomePage implements OnDestroy {
     this.metrics = m;
   }
 
-  // === PDF Export ===
-  private nextFrame(): Promise<void> {
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+// Reemplaza exportPDF() por esta versión de exportación a imagen
+private nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+async exportImage(format: 'png' | 'jpeg' = 'png', quality = 0.92) {
+  const element = document.getElementById('reportArea');
+  if (!element) return;
+
+  try {
+    await this.nextFrame();
+
+    const canvas = await html2canvas(element, {
+      scale: window.devicePixelRatio || 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      onclone: (clonedDoc) => {
+        clonedDoc.body.classList.add('exporting');
+        // Limpieza de estilos que rompen el render
+        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
+        clonedDoc.querySelectorAll('style').forEach(n => n.remove());
+
+        const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
+        clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
+          const inl = el.getAttribute('style') || '';
+          if (BAD_PAT.test(inl)) el.removeAttribute('style');
+          (el as HTMLElement).style.setProperty('--background', '#ffffff');
+          (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
+        });
+
+        const safe = clonedDoc.createElement('style');
+        safe.textContent = `
+          * {
+            background: #ffffff !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            border-color: #e5e7eb !important;
+            color: #111827 !important;
+          }
+          body, ion-content { --background: #ffffff !important; }
+          #reportArea, ion-card, .resumen p, .resumen ul, .resumen ul li, .table-responsive {
+            background: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+          }
+        `;
+        clonedDoc.head.appendChild(safe);
+      },
+    });
+
+    // Genera el blob de imagen
+    const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+    const dataUrl = canvas.toDataURL(mime, quality);
+
+    // Dispara la descarga
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = this.suggestedImageName(format);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+  } catch (err) {
+    console.error('Error al exportar imagen:', err);
+    alert('No se pudo exportar la imagen. Intenta nuevamente.');
   }
+}
 
-  async exportPDF() {
-    const element = document.getElementById('reportArea');
-    if (!element) return;
-
-    try {
-      await this.nextFrame();
-
-      const canvas = await html2canvas(element, {
-        scale: window.devicePixelRatio || 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-        onclone: (clonedDoc) => {
-          clonedDoc.body.classList.add('exporting');
-          clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
-          clonedDoc.querySelectorAll('style').forEach(n => n.remove());
-
-          const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
-          clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
-            const inl = el.getAttribute('style') || '';
-            if (BAD_PAT.test(inl)) el.removeAttribute('style');
-            (el as HTMLElement).style.setProperty('--background', '#ffffff');
-            (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
-          });
-
-          const safe = clonedDoc.createElement('style');
-          safe.textContent = `
-            * {
-              background: #ffffff !important;
-              background-image: none !important;
-              box-shadow: none !important;
-              text-shadow: none !important;
-              border-color: #e5e7eb !important;
-              color: #111827 !important;
-            }
-            body, ion-content { --background: #ffffff !important; }
-            #reportArea, ion-card, .resumen p, .resumen ul, .resumen ul li, .table-responsive {
-              background: #ffffff !important;
-              border: 1px solid #e5e7eb !important;
-            }
-          `;
-          clonedDoc.head.appendChild(safe);
-        },
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgProps = (pdf as any).getImageProperties(imgData);
-      const margin = 5;
-      const pdfWidth = pageWidth - margin * 2;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      let position = margin;
-      let heightLeft = pdfHeight;
-
-      pdf.addImage(imgData, 'PNG', margin, position, pdfWidth, pdfHeight, '', 'FAST');
-      heightLeft -= pageHeight;
-
-      while (heightLeft > -pageHeight) {
-        pdf.addPage();
-        position = 0;
-        pdf.addImage(imgData, 'PNG', margin, position - (pdfHeight - heightLeft), pdfWidth, pdfHeight, '', 'FAST');
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(this.suggestedPdfName());
-    } catch (err) {
-      console.error('Error al exportar PDF:', err);
-      alert('No se pudo exportar el PDF. Se limpió el clon, prueba nuevamente.');
-    }
-  }
-
-  private suggestedPdfName(): string {
-    const today = new Date();
-    const fmt = (n: number) => String(n).padStart(2, '0');
-    const fecha = `${today.getFullYear()}-${fmt(today.getMonth() + 1)}-${fmt(today.getDate())}`;
-    const ub = this.filters.ubicacion || 'Todas';
-    return `Reporte_Camaras_${ub}_${fecha}.pdf`;
-  }
+private suggestedImageName(format: 'png' | 'jpeg'): string {
+  const today = new Date();
+  const fmt = (n: number) => String(n).padStart(2, '0');
+  const fecha = `${today.getFullYear()}-${fmt(today.getMonth() + 1)}-${fmt(today.getDate())}`;
+  const ub = this.filters.ubicacion || 'Todas';
+  const ext = format === 'png' ? 'png' : 'jpg';
+  return `Reporte_Camaras_${ub}_${fecha}.${ext}`;
+}
 
   ngOnDestroy(): void {}
 }

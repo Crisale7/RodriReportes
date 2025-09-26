@@ -1,89 +1,116 @@
 :host {
-  --card-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --text: #0f172a;
-  --muted: #64748b;
-  --accent: var(--ion-color-primary, #3b82f6);
-
-  @media (prefers-color-scheme: dark) {
-    --card-bg: rgba(17, 24, 39, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --text: #e5e7eb;
-    --muted: #94a3b8;
-  }
+  --rz-text: #111827;   /* gris 900 */
+  --rz-muted: #6b7280;  /* gris 500 */
+  --rz-border: #e5e7eb; /* gris 200 */
+  --rz-bg: #ffffff;     /* blanco */
 }
 
-/* ====== Card estilo vidrio ====== */
+/* Card simple, sin efectos que rompan html2canvas */
 ion-card {
-  background: var(--card-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: saturate(130%) blur(8px);
-  border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.12);
-  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 32px rgba(2, 6, 23, 0.2);
-    border-color: color-mix(in oklch, var(--glass-border), var(--accent) 20%);
-  }
-
-  ion-card-title { font-weight: 800; color: var(--text); }
-  ion-card-subtitle { color: var(--muted); font-weight: 500; }
+  background: var(--rz-bg);
+  border: 1px solid var(--rz-border);
+  box-shadow: none;
 }
 
-/* ====== Tabla ====== */
-.table-responsive {
-  width: 100%;
-  overflow: auto;
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: color-mix(in oklch, var(--card-bg), white 8%);
+/* Contenedor de registros */
+.records {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
-.table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 0.92rem;
-  color: var(--text);
+/* Cada registro en una tarjeta */
+.record-card {
+  border: 1px solid var(--rz-border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--rz-bg);
 
-  thead th {
-    position: sticky; 
-    top: 0; 
-    z-index: 1;
-    background: linear-gradient(
-      180deg, 
-      color-mix(in oklch, var(--card-bg), white 20%), 
-      var(--card-bg)
-    );
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--glass-border);
-    text-align: left;
-    font-weight: 800;
-    letter-spacing: .02em;
-    white-space: nowrap;
-  }
-
-  tbody td {
-    padding: 10px 12px;
-    border-bottom: 1px solid color-mix(in oklch, var(--glass-border), black 8%);
-    vertical-align: top;
-    white-space: nowrap;
-  }
-
-  tbody tr:nth-child(odd) td {
-    background: color-mix(in oklch, var(--card-bg), black 4%);
-  }
-
-  tbody tr:hover td {
-    background: color-mix(in oklch, var(--card-bg), var(--accent) 6%);
-  }
+  /* Evita cortes raros al exportar / imprimir */
+  break-inside: avoid;
+  page-break-inside: avoid;
+  box-sizing: border-box;
 }
 
-/* Animación de entrada */
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* Encabezado compacto del registro */
+.record-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--rz-text);
 }
-ion-card { animation: fadeSlideUp .35s ease both; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: 1px solid var(--rz-border);
+  background: #f3f4f6; /* gris 100 */
+  color: #92400e;       /* ámbar oscuro */
+}
+.pill.warn { background: #fff7ed; color: #92400e; border-color: #fed7aa; }
+
+.record-id {
+  font-weight: 800;
+  padding-right: 8px;
+  border-right: 1px solid var(--rz-border);
+}
+
+.record-date, .record-time {
+  color: var(--rz-muted);
+  padding-left: 8px;
+}
+
+/* Grid de pares etiqueta-valor */
+.record-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* En pantallas anchas, dos columnas */
+@media (min-width: 900px) {
+  .record-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .kv-span { grid-column: 1 / -1; } /* campos largos ocupan fila completa */
+}
+
+/* Par etiqueta-valor */
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr; /* etiqueta fija, valor flexible */
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid var(--rz-border);
+  border-radius: 8px;
+  background: var(--rz-bg);
+  box-sizing: border-box;
+}
+
+.kv .k {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--rz-muted);
+}
+
+.kv .v {
+  font-size: 14px;
+  color: var(--rz-text);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.kv .v.strong { font-weight: 800; }

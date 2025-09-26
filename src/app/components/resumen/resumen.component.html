@@ -4,28 +4,48 @@
   </ion-card-header>
 
   <ion-card-content>
-    <div class="resumen">
-      <p><strong>Periodo:</strong> {{ periodo || 'Todo' }}</p>
-
-      <p>
-        <strong>Ubicación:</strong> {{ ubicacion || 'Todas' }} |
-        <strong>Encargado:</strong> {{ encargado || 'Todos' }} |
-        <strong>Momento:</strong> {{ momento || 'Todos' }} |
-        <strong>Operativas:</strong> {{ operativas || 'Todas' }}
+    <div class="resumen-lite">
+      <p class="row">
+        <span class="label">Periodo:</span>
+        <span class="value">{{ periodo || 'Todo' }}</span>
       </p>
 
-      <p><strong>Total reportes:</strong> {{ totalReportes || 0 }}</p>
-
-      <p>
-        <strong>Suma de cámaras totales:</strong> {{ metrics?.totalCamaras || 0 }} |
-        <strong>Operativas (interpretado):</strong> {{ metrics?.operativasInterpretadas || 0 }} |
-        <strong>Con falla declarada:</strong> {{ metrics?.camarasConFalla || 0 }}
+      <p class="row">
+        <span class="label">Ubicación:</span>
+        <span class="value">{{ ubicacion || 'Todas' }}</span>
+        <span class="sep">|</span>
+        <span class="label">Encargado:</span>
+        <span class="value">{{ encargado || 'Todos' }}</span>
+        <span class="sep">|</span>
+        <span class="label">Momento:</span>
+        <span class="value">{{ momento || 'Todos' }}</span>
+        <span class="sep">|</span>
+        <span class="label">Operativas:</span>
+        <span class="value">{{ operativas || 'Todas' }}</span>
       </p>
 
-      <p *ngIf="destacados?.length"><strong>Registros destacados:</strong></p>
-      <ul *ngIf="destacados?.length">
-        <li *ngFor="let d of destacados">{{ d }}</li>
-      </ul>
+      <p class="row">
+        <span class="label">Total reportes:</span>
+        <span class="value strong">{{ totalReportes || 0 }}</span>
+      </p>
+
+      <p class="row">
+        <span class="label">Suma de cámaras totales:</span>
+        <span class="value strong">{{ metrics?.totalCamaras || 0 }}</span>
+        <span class="sep">|</span>
+        <span class="label">Operativas (interpretado):</span>
+        <span class="value strong">{{ metrics?.operativasInterpretadas || 0 }}</span>
+        <span class="sep">|</span>
+        <span class="label">Con falla declarada:</span>
+        <span class="value strong">{{ metrics?.camarasConFalla || 0 }}</span>
+      </p>
+
+      <ng-container *ngIf="destacados?.length">
+        <p class="row"><span class="label">Registros destacados:</span></p>
+        <ul class="destacados">
+          <li *ngFor="let d of destacados">⚠️ {{ d }}</li>
+        </ul>
+      </ng-container>
     </div>
   </ion-card-content>
 </ion-card>

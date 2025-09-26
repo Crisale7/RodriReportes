@@ -2,44 +2,33 @@
   <ion-card-header>
     <ion-card-title>5) Registros filtrados</ion-card-title>
   </ion-card-header>
+
   <ion-card-content>
-    <div class="table-responsive">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Id</th>
-            <th>Fecha Reporte</th>
-            <th>Hora inicio</th>
-            <th>Hora fin</th>
-            <th>Ubicación</th>
-            <th>Encargado</th>
-            <th>Momento</th>
-            <th>Totales</th>
-            <th>Operativas</th>
-            <th>Cámaras con falla (#)</th>
-            <th>Fallas técnicas (texto)</th>
-            <th>Observaciones</th>
-            <th>Recomendación</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let r of filtered">
-            <td>{{ r.id }}</td>
-            <td>{{ r.fechaReporte | date:'yyyy-MM-dd' }}</td>
-            <td>{{ r.horaInicio }}</td>
-            <td>{{ r.horaFin }}</td>
-            <td>{{ r.ubicacion }}</td>
-            <td>{{ r.encargado }}</td>
-            <td>{{ r.momento }}</td>
-            <td>{{ r.totalCamaras }}</td>
-            <td>{{ r.operativasHoy }}</td>
-            <td>{{ r.camsConFalla }}</td>
-            <td>{{ r.fallasGenerales || r.fallaTipo || 'Sin Observaciones' }}</td>
-            <td>{{ r.observaciones }}</td>
-            <td>{{ r.recomendacion }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="records">
+      <article class="record-card" *ngFor="let r of filtered">
+        <header class="record-header">
+          <span class="pill warn">⚠</span>
+          <span class="record-id">#{{ r.id || '—' }}</span>
+          <span class="record-date">{{ r.fechaReporte | date:'yyyy-MM-dd' }}</span>
+          <span class="record-time">
+            {{ r.horaInicio || '—' }} — {{ r.horaFin || '—' }}
+          </span>
+        </header>
+
+        <section class="record-grid">
+          <div class="kv"><span class="k">Ubicación</span><span class="v">{{ r.ubicacion || '—' }}</span></div>
+          <div class="kv"><span class="k">Encargado</span><span class="v">{{ r.encargado || '—' }}</span></div>
+          <div class="kv"><span class="k">Momento</span><span class="v">{{ r.momento || '—' }}</span></div>
+
+          <div class="kv"><span class="k">Cámaras totales</span><span class="v">{{ r.totalCamaras ?? '—' }}</span></div>
+          <div class="kv"><span class="k">Operativas</span><span class="v">{{ r.operativasHoy || '—' }}</span></div>
+          <div class="kv"><span class="k">Con falla (#)</span><span class="v strong">{{ r.camsConFalla ?? 0 }}</span></div>
+
+          <div class="kv kv-span"><span class="k">Fallas técnicas (texto)</span><span class="v">{{ r.fallasGenerales || r.fallaTipo || 'Sin Observaciones' }}</span></div>
+          <div class="kv kv-span"><span class="k">Observaciones</span><span class="v">{{ r.observaciones || '—' }}</span></div>
+          <div class="kv kv-span"><span class="k">Recomendación</span><span class="v">{{ r.recomendacion || '—' }}</span></div>
+        </section>
+      </article>
     </div>
   </ion-card-content>
 </ion-card>
