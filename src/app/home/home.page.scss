@@ -81,41 +81,6 @@ ion-card {
   }
 }
 
-/* ====== Tabla ====== */
-.table-responsive {
-  width: 100%;
-  overflow: auto;
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: color-mix(in oklch, var(--card-bg), white 8%);
-}
-.table {
-  border-collapse: separate;
-  border-spacing: 0;
-  width: 100%;
-  font-size: 0.92rem;
-  color: var(--text);
-
-  thead th {
-    position: sticky; top: 0; z-index: 2;
-    background: linear-gradient(180deg, color-mix(in oklch, var(--card-bg), white 20%), var(--card-bg));
-    text-align: left;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--glass-border);
-    white-space: nowrap;
-    font-weight: 800;
-    letter-spacing: .02em;
-  }
-  tbody tr { transition: background-color .2s ease; }
-  tbody td {
-    padding: 10px 12px;
-    border-bottom: 1px solid color-mix(in oklch, var(--glass-border), black 8%);
-    vertical-align: top; white-space: nowrap;
-  }
-  tbody tr:nth-child(odd) td { background: color-mix(in oklch, var(--card-bg), black 4%); }
-  tbody tr:hover td { background: color-mix(in oklch, var(--card-bg), var(--accent) 6%); }
-}
-
 /* ====== Botones / Chips / Iconos ====== */
 ion-button[color="primary"] {
   --border-radius: 12px;
@@ -145,5 +110,8 @@ ion-icon { color: var(--accent); }
 }
 
 /* Animación entrada */
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeSlideUp { 
+  from { opacity: 0; transform: translateY(6px); } 
+  to   { opacity: 1; transform: translateY(0); } 
+}
 ion-card { animation: fadeSlideUp .35s ease both; }

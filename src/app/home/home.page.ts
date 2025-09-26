@@ -13,29 +13,7 @@ import html2canvas from 'html2canvas';
 
 import { MetricasComponent } from '../components/metricas/metricas.component';
 import { ResumenComponent } from '../components/resumen/resumen.component';
-
-type Registro = {
-  id: string;
-  horaInicio: string;
-  horaFin: string;
-  correo: string;
-  nombre: string;
-  ubicacion: string;
-  encargado: string;
-  fechaReporte: Date | null;
-  momento: string;
-  totalCamaras: number;
-  operativasHoy: string;
-  malaCalidad?: string;
-  camsConFalla: number;
-  detalleFallas?: string;
-  fallaTipo?: string;
-  fallasGenerales?: string;
-  observaciones?: string;
-  adjuntos?: string;
-  recomendacion?: string;
-  raw?: any;
-};
+import { RegistrosComponent, Registro } from '../components/registros/registros.component';
 
 type Metrics = {
   totalCamaras: number;
@@ -54,7 +32,8 @@ type Metrics = {
     IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
     IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon,
     MetricasComponent,
-    ResumenComponent
+    ResumenComponent,
+    RegistrosComponent
   ]
 })
 export class HomePage implements OnDestroy {
@@ -96,6 +75,7 @@ export class HomePage implements OnDestroy {
 
   constructor() {}
 
+  // === CSV ===
   onFileSelected(evt: Event) {
     const input = evt.target as HTMLInputElement;
     if (!input.files || !input.files.length) return;
@@ -107,23 +87,6 @@ export class HomePage implements OnDestroy {
     reader.onload = () => {
       const csvText = (reader.result ?? '') as string;
 
-      interface PapaParseResult<T> {
-        data: T[];
-        errors: any[];
-        meta: any;
-      }
-
-      interface PapaParseConfig<T> {
-        header?: boolean;
-        skipEmptyLines?: boolean;
-        encoding?: string;
-        delimiter?: string;
-        quoteChar?: string;
-        transformHeader?: (header: string) => string;
-        complete?: (result: PapaParseResult<T>) => void;
-        error?: (error: any) => void;
-      }
-
       Papa.parse<any>(csvText, {
         header: true,
         skipEmptyLines: true,
@@ -131,7 +94,7 @@ export class HomePage implements OnDestroy {
         delimiter: ',',
         quoteChar: '"',
         transformHeader: (h: string) => this.cleanHeader(h),
-        complete: (result: PapaParseResult<any>) => {
+        complete: (result) => {
           try {
             const data: Registro[] = (result.data as any[]).map((r: any) => this.mapRow(r));
             this.rows = data.filter((d: Registro) => !!d.id || !!d.ubicacion || !!d.encargado);
@@ -150,7 +113,7 @@ export class HomePage implements OnDestroy {
           console.error(err);
           alert('No se pudo leer el CSV. Verifica codificación UTF-8 y separadores.');
         }
-      } as PapaParseConfig<any>);
+      });
     };
     reader.onerror = (e) => {
       console.error(e);
@@ -233,6 +196,7 @@ export class HomePage implements OnDestroy {
     return isNaN(n) ? def : n;
   }
 
+  // === Filtros ===
   private buildLookups() {
     const uniq = (arr: (string | undefined | null)[]) => [...new Set(arr.filter((x): x is string => !!x))];
 
@@ -329,6 +293,7 @@ export class HomePage implements OnDestroy {
     this.metrics = m;
   }
 
+  // === PDF Export ===
   private nextFrame(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
@@ -347,7 +312,6 @@ export class HomePage implements OnDestroy {
         logging: false,
         onclone: (clonedDoc) => {
           clonedDoc.body.classList.add('exporting');
-
           clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
           clonedDoc.querySelectorAll('style').forEach(n => n.remove());
 

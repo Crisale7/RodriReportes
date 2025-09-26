@@ -1,0 +1,89 @@
+:host {
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: var(--ion-color-primary, #3b82f6);
+
+  @media (prefers-color-scheme: dark) {
+    --card-bg: rgba(17, 24, 39, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+  }
+}
+
+/* ====== Card estilo vidrio ====== */
+ion-card {
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: saturate(130%) blur(8px);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.12);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(2, 6, 23, 0.2);
+    border-color: color-mix(in oklch, var(--glass-border), var(--accent) 20%);
+  }
+
+  ion-card-title { font-weight: 800; color: var(--text); }
+  ion-card-subtitle { color: var(--muted); font-weight: 500; }
+}
+
+/* ====== Tabla ====== */
+.table-responsive {
+  width: 100%;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: color-mix(in oklch, var(--card-bg), white 8%);
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.92rem;
+  color: var(--text);
+
+  thead th {
+    position: sticky; 
+    top: 0; 
+    z-index: 1;
+    background: linear-gradient(
+      180deg, 
+      color-mix(in oklch, var(--card-bg), white 20%), 
+      var(--card-bg)
+    );
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--glass-border);
+    text-align: left;
+    font-weight: 800;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid color-mix(in oklch, var(--glass-border), black 8%);
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  tbody tr:nth-child(odd) td {
+    background: color-mix(in oklch, var(--card-bg), black 4%);
+  }
+
+  tbody tr:hover td {
+    background: color-mix(in oklch, var(--card-bg), var(--accent) 6%);
+  }
+}
+
+/* Animación de entrada */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+ion-card { animation: fadeSlideUp .35s ease both; }
