@@ -81,76 +81,13 @@ ion-card {
   }
 }
 
-/* ====== KPIs ====== */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: clamp(10px, 1.4vw, 16px);
-  margin-bottom: 8px;
-}
-
-.kpi {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0)) padding-box,
-    conic-gradient(from 180deg at 50% 0%, rgba(59, 130, 246, .12), rgba(34, 211, 238, .12), transparent) border-box;
-  border: 1px solid transparent;
-
-  grid-column: span 12;
-  @media (min-width: 540px) { grid-column: span 6; }
-  @media (min-width: 900px) { grid-column: span 3; }
-
-  .kpi-title {
-    font-size: .82rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-  .kpi-value {
-    font-weight: 800;
-    font-size: clamp(1.6rem, 3.2vw, 2.1rem);
-    color: var(--text);
-    line-height: 1.1;
-    animation: valuePulse 3.2s ease-in-out infinite;
-  }
-}
-
-@keyframes valuePulse {
-  0%, 100% { filter: drop-shadow(0 0 0 rgba(59,130,246,0)); }
-  50%      { filter: drop-shadow(0 0 10px rgba(59,130,246,.25)); }
-}
-
-/* ====== Charts ====== */
-.charts {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: clamp(10px, 1.4vw, 16px);
-}
-.charts ion-card {
-  display: flex; flex-direction: column;
-  grid-column: span 12;
-  @media (min-width: 700px)  { grid-column: span 6; }
-  @media (min-width: 1200px) { grid-column: span 3; }
-}
-.charts ion-card-content { display: grid; place-items: center; padding-top: 6px; }
-.charts canvas {
-  width: 100% !important;
-  height: clamp(240px, 28vh, 340px) !important;
-  display: block;
-  image-rendering: -webkit-optimize-contrast;
-  transform: translateZ(0);
-}
-
 /* ====== Resumen (texto) ====== */
 .resumen {
-  /* Grid único de 12 cols para controlar bien el ancho */
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: clamp(12px, 1.6vw, 18px);
   color: var(--text);
 
-  /* Tarjetas-párrafo (periodo, filtros, totales, sumas, top fallas) */
   p {
     background: linear-gradient(180deg, color-mix(in oklch, var(--card-bg), white 12%), var(--card-bg)) padding-box;
     border: 1px solid color-mix(in oklch, var(--glass-border), white 10%);
@@ -161,14 +98,10 @@ ion-card {
     font-size: .95rem;
     line-height: 1.35;
 
-    /* Layout: en escritorio ocupan 8 columnas, en móvil todo el ancho */
     grid-column: 1 / -1;
-    @media (min-width: 980px) {
-      grid-column: 1 / span 8;
-    }
+    @media (min-width: 980px) { grid-column: 1 / span 8; }
   }
 
-  /* Chips para los <strong> de cada línea */
   p > strong {
     display: inline-block;
     font-size: .72rem;
@@ -182,14 +115,11 @@ ion-card {
     margin-right: 8px;
   }
 
-  /* Números resaltados */
   p :where(b, .num, .kpi) { font-weight: 800; color: color-mix(in oklch, var(--text), var(--accent) 20%); }
-  p:nth-of-type(2) { word-break: break-word; } /* línea de ubicación/encargado/momento/operativas */
+  p:nth-of-type(2) { word-break: break-word; }
 
-  /* ====== Nube contenedora de REGISTROS DESTACADOS ====== */
-  /* Usamos el UL como "nube" a pantalla completa y dentro van las sub-nubes (LI) */
   ul {
-    grid-column: 1 / -1; /* SIEMPRE a lo ancho: ya no se va al costado */
+    grid-column: 1 / -1;
     list-style: none;
     margin: 0;
     padding: 12px;
@@ -202,16 +132,12 @@ ion-card {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-
-    /* Etiqueta del título anterior (el <p><strong>Registros destacados</strong></p>)
-       quedará justo encima. Para darle coherencia visual, podemos separarla un poco: */
     margin-top: -4px;
   }
 
-  /* Sub-nubes (cada li) como “píldoras” responsivas */
   ul li {
     position: relative;
-    flex: 1 1 320px;         /* se adaptan: mínimo ~320px */
+    flex: 1 1 320px;
     max-width: 100%;
     padding: 10px 12px 10px 34px;
     border-radius: 12px;
@@ -236,24 +162,11 @@ ion-card {
     }
   }
 
-  /* Responsive */
   @media (max-width: 720px) {
     p, ul { grid-column: 1 / -1; }
     ul { padding: 10px; }
     ul li { flex: 1 1 100%; }
   }
-}
-
-/* Chips utilitarios si los necesitas en texto */
-.resumen .chip {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--accent) 12%, white 88%);
-  color: color-mix(in oklch, var(--text), var(--accent) 20%);
-  font-weight: 700;
-  font-size: .8rem;
-  margin: 2px 6px 2px 0;
 }
 
 /* ====== Tabla ====== */
@@ -291,7 +204,7 @@ ion-card {
   tbody tr:hover td { background: color-mix(in oklch, var(--card-bg), var(--accent) 6%); }
 }
 
-/* ====== Botones ====== */
+/* ====== Botones / Chips / Iconos ====== */
 ion-button[color="primary"] {
   --border-radius: 12px;
   --box-shadow: 0 10px 20px rgba(59,130,246,.26);
@@ -301,7 +214,6 @@ ion-button[color="primary"] {
   &:hover { filter: brightness(1.02) saturate(1.04); transform: translateY(-1px); }
 }
 
-/* ====== Chips / Notes ====== */
 ion-chip[color="success"] {
   --background: color-mix(in oklch, #10b981 35%, white 65%);
   --color: #065f46;
@@ -309,7 +221,6 @@ ion-chip[color="success"] {
   border-radius: 999px;
 }
 
-/* ====== Iconos ====== */
 ion-icon { color: var(--accent); }
 
 /* ====== Footer space ====== */
@@ -319,9 +230,8 @@ ion-icon { color: var(--accent); }
 @media print {
   ion-content { --background: #fff; }
   ion-card { background: #fff !important; border: 1px solid #e5e7eb !important; box-shadow: none !important; }
-  .charts canvas { height: 260px !important; }
 }
 
-/* ====== Animación de entrada ====== */
+/* Animación entrada */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 ion-card { animation: fadeSlideUp .35s ease both; }

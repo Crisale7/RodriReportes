@@ -1,0 +1,73 @@
+<ion-card>
+  <ion-card-header>
+    <ion-card-title>3) Métricas</ion-card-title>
+  </ion-card-header>
+  <ion-card-content>
+    <!-- KPIs -->
+    <div class="kpis">
+      <ion-card class="kpi">
+        <ion-card-content>
+          <div class="kpi-title">Reportes filtrados</div>
+          <div class="kpi-value">{{ filtered.length || 0 }}</div>
+        </ion-card-content>
+      </ion-card>
+      <ion-card class="kpi">
+        <ion-card-content>
+          <div class="kpi-title">Cámaras totales (suma filas)</div>
+          <div class="kpi-value">{{ metrics.totalCamaras }}</div>
+        </ion-card-content>
+      </ion-card>
+      <ion-card class="kpi">
+        <ion-card-content>
+          <div class="kpi-title">Cámaras operativas</div>
+          <div class="kpi-value">{{ metrics.operativasInterpretadas }}</div>
+        </ion-card-content>
+      </ion-card>
+      <ion-card class="kpi">
+        <ion-card-content>
+          <div class="kpi-title">Cámaras con fallas</div>
+          <div class="kpi-value">{{ metrics.camarasConFalla }}</div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="charts">
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Operativas vs Totales</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <canvas #chartOperativas></canvas>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Fallas por Tipo (top)</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <canvas #chartFallasTipo></canvas>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Reportes por Ubicación</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <canvas #chartReportesUbicacion></canvas>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Cámaras con Falla por Ubicación</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <canvas #chartFallaUbicacion></canvas>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </ion-card-content>
+</ion-card>

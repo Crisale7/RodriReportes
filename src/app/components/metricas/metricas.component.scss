@@ -1,0 +1,85 @@
+/* ====== Variables locales (fallback si no existen globales) ====== */
+:host {
+  --text: #0f172a;
+  --muted: #64748b;
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ====== KPIs ====== */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: clamp(10px, 1.4vw, 16px);
+  margin-bottom: 8px;
+}
+
+.kpi {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0)) padding-box,
+    conic-gradient(from 180deg at 50% 0%, rgba(59,130,246,.12), rgba(34,211,238,.12), transparent) border-box;
+  border: 1px solid transparent;
+
+  grid-column: span 12;
+  @media (min-width: 540px) { grid-column: span 6; }
+  @media (min-width: 900px) { grid-column: span 3; }
+
+  .kpi-title {
+    font-size: .82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-weight: 800;
+    font-size: clamp(1.6rem, 3.2vw, 2.1rem);
+    color: var(--text);
+    line-height: 1.1;
+    animation: valuePulse 3.2s ease-in-out infinite;
+  }
+}
+
+@keyframes valuePulse {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(59,130,246,0)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(59,130,246,.25)); }
+}
+
+/* ====== Charts ====== */
+.charts {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: clamp(10px, 1.4vw, 16px);
+}
+.charts ion-card {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 12;
+  @media (min-width: 700px)  { grid-column: span 6; }
+  @media (min-width: 1200px) { grid-column: span 3; }
+}
+.charts ion-card-content {
+  display: grid;
+  place-items: center;
+  padding-top: 6px;
+}
+.charts canvas {
+  width: 100% !important;
+  height: clamp(240px, 28vh, 340px) !important;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+  transform: translateZ(0);
+}
+
+/* ====== Compat impresión ====== */
+@media print {
+  .charts canvas { height: 260px !important; }
+}
+
+/* ====== Animación de entrada ====== */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+ion-card { animation: fadeSlideUp .35s ease both; }

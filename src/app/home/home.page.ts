@@ -7,15 +7,16 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-// CSV parse robusto
+// CSV
 import Papa from 'papaparse';
 
-// Chart.js (auto registra controllers/escalas)
-import Chart from 'chart.js/auto';
-
-// Exportación a PDF (pantalla completa seleccionada)
+// PDF/Imagen
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { MetricasComponent } from '../components/metricas/metricas.component';
+
+// Nuestro componente hijo
+
 
 type Registro = {
   id: string;
@@ -40,6 +41,12 @@ type Registro = {
   raw?: any;
 };
 
+type Metrics = {
+  totalCamaras: number;
+  operativasInterpretadas: number;
+  camarasConFalla: number;
+};
+
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
@@ -49,7 +56,8 @@ type Registro = {
     CommonModule, FormsModule,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
     IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
-    IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon
+    IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon,
+    MetricasComponent // <-- registra el componente
   ]
 })
 export class HomePage implements OnDestroy {
@@ -62,17 +70,12 @@ export class HomePage implements OnDestroy {
 
   // Filtros
   filters = {
-    // dropdowns de fecha (strings "yyyy-MM-dd")
     fechaDesde: '' as string,
     fechaHasta: '' as string,
-
-    // filtros existentes
     ubicacion: '' as string,
     encargado: '' as string,
     momento: '' as string,
     operativas: '' as string,
-
-    // rango calculado internamente a partir de los dropdowns
     dateStart: null as Date | null,
     dateEnd: null as Date | null
   };
@@ -86,50 +89,20 @@ export class HomePage implements OnDestroy {
     operativas: ['Todas', 'Mas de la Mitad', 'Menos de la Mitad', 'No'] as string[]
   };
 
-  // Métricas + Resumen
-  metrics = {
+  // Métricas (vienen del hijo por evento)
+  metrics: Metrics = {
     totalCamaras: 0,
     operativasInterpretadas: 0,
     camarasConFalla: 0
   };
 
+  // Resumen
   resumen = {
     periodo: '',
     destacados: [] as string[]
   };
 
-  // Charts
-  private charts: Chart[] = [];
-  private fillerTextPlugin: any;
-
-  constructor() {
-    // Tipografía y color por defecto para todos los charts
-    Chart.defaults.font.family = 'system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial';
-    Chart.defaults.color = '#334155'; // slate-700
-
-    // Plugin para mostrar mensaje cuando no hay datos tras filtros
-    this.fillerTextPlugin = {
-      id: 'fillerText',
-      afterDraw: (chart: any) => {
-        const ds = chart.data?.datasets?.[0]?.data || [];
-        const total = Array.isArray(ds) ? ds.reduce((a: number, b: number) => a + (Number(b) || 0), 0) : 0;
-        const noLabels = !chart.data?.labels?.length;
-        if ((total === 0 && ds.length > 0) || noLabels) {
-          const { ctx, chartArea } = chart;
-          if (!chartArea) return;
-          ctx.save();
-          ctx.fillStyle = '#94a3b8';
-          ctx.font = '600 14px system-ui, -apple-system, Segoe UI, Roboto';
-          ctx.textAlign = 'center';
-          ctx.fillText('Sin datos para los filtros actuales',
-            (chartArea.left + chartArea.right) / 2,
-            (chartArea.top + chartArea.bottom) / 2
-          );
-          ctx.restore();
-        }
-      }
-    };
-  }
+  constructor() {}
 
   // ====== CARGA CSV ======
   onFileSelected(evt: Event) {
@@ -252,14 +225,12 @@ export class HomePage implements OnDestroy {
     return isNaN(n) ? def : n;
   }
 
-  // ====== LOOKUPS (incluye fechas únicas para dropdowns) ======
+  // ====== LOOKUPS ======
   private buildLookups() {
     const uniq = (arr: (string | undefined | null)[]) => [...new Set(arr.filter((x): x is string => !!x))];
 
-    // Fechas únicas a partir de fechaReporte -> formato "yyyy-MM-dd"
     const fechas = uniq(
-      this.rows
-        .map(r => r.fechaReporte ? this.dateToKey(r.fechaReporte) : null)
+      this.rows.map(r => r.fechaReporte ? this.dateToKey(r.fechaReporte) : null)
     ).sort();
 
     this.lookups.fechas = fechas;
@@ -286,7 +257,7 @@ export class HomePage implements OnDestroy {
     return isNaN(dt.getTime()) ? null : dt;
   }
 
-  // ====== FECHAS: handler de los dropdowns ======
+  // ====== FECHAS: handler de dropdowns ======
   onFechaSelectChange() {
     this.filters.dateStart = this.filters.fechaDesde ? this.keyToDate(this.filters.fechaDesde) : null;
     this.filters.dateEnd = this.filters.fechaHasta ? this.keyToDate(this.filters.fechaHasta) : null;
@@ -325,8 +296,7 @@ export class HomePage implements OnDestroy {
       return true;
     });
 
-    this.computeMetrics();
-    this.updateCharts();
+    // Las métricas ahora las calcula el componente hijo; aquí solo armamos el resumen.
     this.buildResumen();
   }
 
@@ -335,24 +305,6 @@ export class HomePage implements OnDestroy {
   }
   private stripTimeEnd(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  }
-
-  private computeMetrics() {
-    const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
-    this.metrics.totalCamaras = sum(this.filtered.map(r => r.totalCamaras || 0));
-    this.metrics.camarasConFalla = sum(this.filtered.map(r => r.camsConFalla || 0));
-
-    const ratio = (s: string) => {
-      const v = (s || '').toLowerCase();
-      if (v === 'todas') return 1;
-      if (v.includes('mas de la mitad') || v.includes('más de la mitad')) return 0.7;
-      if (v.includes('menos de la mitad')) return 0.3;
-      if (v === 'no') return 0;
-      return 0.5;
-    };
-    this.metrics.operativasInterpretadas = this.filtered
-      .map(r => Math.round((r.totalCamaras || 0) * ratio(r.operativasHoy || '')))
-      .reduce((a, b) => a + b, 0);
   }
 
   private buildResumen() {
@@ -368,272 +320,93 @@ export class HomePage implements OnDestroy {
       .map(r => `#${r.id} - ${r.ubicacion}: ${r.camsConFalla} cam(s) con falla. ${r.recomendacion || ''}`.trim());
   }
 
-  // ====== Utils para charts ======
-  private shortLabel(label: string, max = 16): string {
-    const s = (label || '').trim();
-    if (s.length <= max) return s;
-    const cut = s.slice(0, max).lastIndexOf(' ');
-    return (cut > 8 ? s.slice(0, cut) : s.slice(0, max - 1)) + '…';
+  // ====== Evento desde <app-metricas> ======
+  onMetricsChange(m: Metrics) {
+    this.metrics = m;
+    // Si quieres que el resumen reaccione a cambios de métricas (no necesario hoy), descomenta:
+    // this.buildResumen();
   }
-
-  private getBaseOptions(): any {
-    return {
-      responsive: true,
-      maintainAspectRatio: false, // usa altura de canvas del SCSS
-      animation: { duration: 600, easing: 'easeOutQuart' },
-      layout: { padding: { top: 6, right: 8, bottom: 6, left: 8 } },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          align: 'center',
-          labels: {
-            usePointStyle: true,
-            pointStyle: 'rect',
-            boxWidth: 10,
-            boxHeight: 10,
-            borderRadius: 2
-          }
-        },
-        tooltip: { intersect: false, mode: 'index' }
-      }
-    };
-  }
-
-  private getBarOptions(): any {
-    const base = this.getBaseOptions();
-    return {
-      ...base,
-      plugins: { ...base.plugins, legend: { display: false } },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: {
-            autoSkip: false,
-            maxRotation: 0,
-            minRotation: 0,
-            callback: (_: any, idx: number, ticks: any) => {
-              const label = (ticks[idx]?.label ?? '').toString();
-              return this.shortLabel(label, 24);
-            }
-          }
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: 'rgba(0,0,0,0.06)' },
-          ticks: { precision: 0 }
-        }
-      }
-    };
-  }
-
-  private getDoughnutOptions(): any {
-    const base = this.getBaseOptions();
-    return {
-      ...base,
-      cutout: '62%',
-      plugins: {
-        ...base.plugins,
-        legend: { ...base.plugins.legend, position: 'bottom', labels: { ...base.plugins.legend.labels, padding: 10 } }
-      }
-    };
-  }
-
-  // ====== CHARTS ======
-  private destroyCharts() {
-    this.charts.forEach(c => c.destroy());
-    this.charts = [];
-  }
-
-  private updateCharts() {
-    this.destroyCharts();
-
-    // 1) Operativas vs Totales (Doughnut)
-    const ctx1 = (document.getElementById('chartOperativas') as HTMLCanvasElement)?.getContext('2d');
-    if (ctx1) {
-      const total = Math.max(this.metrics.totalCamaras, 0);
-      const op = Math.min(this.metrics.operativasInterpretadas, total);
-      const noOp = Math.max(total - op, 0);
-
-      this.charts.push(new Chart(ctx1, {
-        type: 'doughnut',
-        data: {
-          labels: ['Operativas (aprox.)', 'No operativas (aprox.)'],
-          datasets: [{ data: [op, noOp] }]
-        },
-        options: this.getDoughnutOptions(),
-        plugins: [this.fillerTextPlugin]
-      }));
-    }
-
-    // 2) Fallas por Tipo (top)
-    const fallas: Record<string, number> = {};
-    this.filtered.forEach(r => {
-      const all = `${r.fallaTipo || ''};${r.fallasGenerales || ''}`
-        .split(/[;,\t]/g)
-        .map(x => x.trim())
-        .filter(Boolean);
-      all.forEach(f => fallas[f] = (fallas[f] || 0) + 1);
-    });
-    const sortedFallas = Object.entries(fallas).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    const ctx2 = (document.getElementById('chartFallasTipo') as HTMLCanvasElement)?.getContext('2d');
-    if (ctx2) {
-      this.charts.push(new Chart(ctx2, {
-        type: 'bar',
-        data: {
-          labels: sortedFallas.map(([k]) => this.shortLabel(k, 28)),
-          datasets: [{
-            label: 'Conteo',
-            data: sortedFallas.map(([, v]) => v),
-            borderWidth: 1,
-            borderRadius: 6,
-            barPercentage: 0.7,
-            categoryPercentage: 0.7
-          }]
-        },
-        options: this.getBarOptions(),
-        plugins: [this.fillerTextPlugin]
-      }));
-    }
-
-    // 3) Reportes por Ubicación
-    const repUb: Record<string, number> = {};
-    this.filtered.forEach(r => { repUb[r.ubicacion] = (repUb[r.ubicacion] || 0) + 1; });
-    const ctx3 = (document.getElementById('chartReportesUbicacion') as HTMLCanvasElement)?.getContext('2d');
-    if (ctx3) {
-      const pairs = Object.entries(repUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      this.charts.push(new Chart(ctx3, {
-        type: 'bar',
-        data: {
-          labels: pairs.map(([k]) => this.shortLabel(k, 28)),
-          datasets: [{
-            label: 'Reportes',
-            data: pairs.map(([, v]) => v),
-            borderWidth: 1,
-            borderRadius: 6,
-            barPercentage: 0.7,
-            categoryPercentage: 0.7
-          }]
-        },
-        options: this.getBarOptions(),
-        plugins: [this.fillerTextPlugin]
-      }));
-    }
-
-    // 4) Cámaras con Falla por Ubicación
-    const fallaUb: Record<string, number> = {};
-    this.filtered.forEach(r => { fallaUb[r.ubicacion] = (fallaUb[r.ubicacion] || 0) + (r.camsConFalla || 0); });
-    const ctx4 = (document.getElementById('chartFallaUbicacion') as HTMLCanvasElement)?.getContext('2d');
-    if (ctx4) {
-      const pairs = Object.entries(fallaUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      this.charts.push(new Chart(ctx4, {
-        type: 'bar',
-        data: {
-          labels: pairs.map(([k]) => this.shortLabel(k, 28)),
-          datasets: [{
-            label: 'Cáms con falla',
-            data: pairs.map(([, v]) => v),
-            borderWidth: 1,
-            borderRadius: 6,
-            barPercentage: 0.7,
-            categoryPercentage: 0.7
-          }]
-        },
-        options: this.getBarOptions(),
-        plugins: [this.fillerTextPlugin]
-      }));
-    }
-  }
-private nextFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
 
   // ====== EXPORTAR PDF ======
-async exportPDF() {
-  const element = document.getElementById('reportArea');
-  if (!element) return;
-
-  try {
-    await this.nextFrame();
-
-    const canvas = await html2canvas(element, {
-      scale: window.devicePixelRatio || 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-
-      onclone: (clonedDoc) => {
-        // 0) Marca de modo export
-        clonedDoc.body.classList.add('exporting');
-
-        // 1) Elimina todos los <link rel="stylesheet"> y TODOS los <style>
-        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
-        clonedDoc.querySelectorAll('style').forEach(n => n.remove());
-
-        // 2) Limpia estilos inline problemáticos (oklch / color-mix / gradients)
-        const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
-        clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
-          const inl = el.getAttribute('style') || '';
-          if (BAD_PAT.test(inl)) el.removeAttribute('style');
-          // Asegura fondo y variables más usadas
-          (el as HTMLElement).style.setProperty('--background', '#ffffff');
-          (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
-        });
-
-        // 3) Inyecta un reset plano y seguro
-        const safe = clonedDoc.createElement('style');
-        safe.textContent = `
-          /* Reset total para evitar funciones CSS no soportadas por html2canvas */
-          * {
-            background: #ffffff !important;
-            background-image: none !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-            border-color: #e5e7eb !important;
-            color: #111827 !important;
-          }
-          body, ion-content { --background: #ffffff !important; }
-          #reportArea, ion-card, .kpi, .resumen p, .resumen ul, .resumen ul li, .table-responsive {
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-          }
-          .charts canvas { background: #ffffff !important; }
-        `;
-        clonedDoc.head.appendChild(safe);
-      },
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const imgProps = (pdf as any).getImageProperties(imgData);
-    const margin = 5;
-    const pdfWidth = pageWidth - margin * 2;
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    let position = margin;
-    let heightLeft = pdfHeight;
-
-    pdf.addImage(imgData, 'PNG', margin, position, pdfWidth, pdfHeight, '', 'FAST');
-    heightLeft -= pageHeight;
-
-    while (heightLeft > -pageHeight) {
-      pdf.addPage();
-      position = 0;
-      pdf.addImage(imgData, 'PNG', margin,
-        position - (pdfHeight - heightLeft), pdfWidth, pdfHeight, '', 'FAST');
-      heightLeft -= pageHeight;
-    }
-
-    pdf.save(this.suggestedPdfName());
-  } catch (err) {
-    console.error('Error al exportar PDF:', err);
-    alert('No se pudo exportar el PDF. Se limpió el clon, prueba nuevamente.');
+  private nextFrame(): Promise<void> {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
-}
 
+  async exportPDF() {
+    const element = document.getElementById('reportArea');
+    if (!element) return;
+
+    try {
+      await this.nextFrame();
+
+      const canvas = await html2canvas(element, {
+        scale: window.devicePixelRatio || 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          clonedDoc.body.classList.add('exporting');
+
+          clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
+          clonedDoc.querySelectorAll('style').forEach(n => n.remove());
+
+          const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
+          clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
+            const inl = el.getAttribute('style') || '';
+            if (BAD_PAT.test(inl)) el.removeAttribute('style');
+            (el as HTMLElement).style.setProperty('--background', '#ffffff');
+            (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
+          });
+
+          const safe = clonedDoc.createElement('style');
+          safe.textContent = `
+            * {
+              background: #ffffff !important;
+              background-image: none !important;
+              box-shadow: none !important;
+              text-shadow: none !important;
+              border-color: #e5e7eb !important;
+              color: #111827 !important;
+            }
+            body, ion-content { --background: #ffffff !important; }
+            #reportArea, ion-card, .resumen p, .resumen ul, .resumen ul li, .table-responsive {
+              background: #ffffff !important;
+              border: 1px solid #e5e7eb !important;
+            }
+          `;
+          clonedDoc.head.appendChild(safe);
+        },
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgProps = (pdf as any).getImageProperties(imgData);
+      const margin = 5;
+      const pdfWidth = pageWidth - margin * 2;
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      let position = margin;
+      let heightLeft = pdfHeight;
+
+      pdf.addImage(imgData, 'PNG', margin, position, pdfWidth, pdfHeight, '', 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft > -pageHeight) {
+        pdf.addPage();
+        position = 0;
+        pdf.addImage(imgData, 'PNG', margin, position - (pdfHeight - heightLeft), pdfWidth, pdfHeight, '', 'FAST');
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(this.suggestedPdfName());
+    } catch (err) {
+      console.error('Error al exportar PDF:', err);
+      alert('No se pudo exportar el PDF. Se limpió el clon, prueba nuevamente.');
+    }
+  }
 
   private suggestedPdfName(): string {
     const today = new Date();
@@ -643,7 +416,5 @@ async exportPDF() {
     return `Reporte_Camaras_${ub}_${fecha}.pdf`;
   }
 
-  ngOnDestroy(): void {
-    this.destroyCharts();
-  }
+  ngOnDestroy(): void {}
 }
