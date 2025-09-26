@@ -29,6 +29,7 @@
     "@ionic/angular": "^8.0.0",
     "apexcharts": "^5.3.5",
     "chart.js": "^4.5.0",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "html2canvas": "^1.4.1",
     "ionicons": "^7.0.0",
     "jspdf": "^3.0.3",

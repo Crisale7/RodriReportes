@@ -39,15 +39,21 @@
         </ion-card-header>
         <ion-card-content>
           <canvas #chartOperativas></canvas>
+          <p class="chart-desc">
+            Muestra la proporción de cámaras que se estiman operativas frente al total registrado.
+          </p>
         </ion-card-content>
       </ion-card>
 
       <ion-card>
         <ion-card-header>
-          <ion-card-title>Fallas por Tipo (top)</ion-card-title>
+          <ion-card-title>Distribución por Momento</ion-card-title>
         </ion-card-header>
         <ion-card-content>
-          <canvas #chartFallasTipo></canvas>
+          <canvas #chartMomento></canvas>
+          <p class="chart-desc">
+            Permite ver en qué momento del día (mañana, tarde, noche) ocurren más incidentes reportados.
+          </p>
         </ion-card-content>
       </ion-card>
 
@@ -57,6 +63,9 @@
         </ion-card-header>
         <ion-card-content>
           <canvas #chartReportesUbicacion></canvas>
+          <p class="chart-desc">
+            Indica cuáles ubicaciones concentran la mayor cantidad de reportes realizados.
+          </p>
         </ion-card-content>
       </ion-card>
 
@@ -66,6 +75,9 @@
         </ion-card-header>
         <ion-card-content>
           <canvas #chartFallaUbicacion></canvas>
+          <p class="chart-desc">
+            Muestra dónde se encuentran la mayor cantidad de cámaras con fallas registradas.
+          </p>
         </ion-card-content>
       </ion-card>
     </div>
