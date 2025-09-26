@@ -544,38 +544,96 @@ export class HomePage implements OnDestroy {
       }));
     }
   }
+private nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
 
   // ====== EXPORTAR PDF ======
-  async exportPDF() {
-    const element = document.getElementById('reportArea');
-    if (!element) return;
+async exportPDF() {
+  const element = document.getElementById('reportArea');
+  if (!element) return;
 
-    const canvas = await html2canvas(element, { scale: window.devicePixelRatio || 2, useCORS: true, logging: false });
+  try {
+    await this.nextFrame();
+
+    const canvas = await html2canvas(element, {
+      scale: window.devicePixelRatio || 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+
+      onclone: (clonedDoc) => {
+        // 0) Marca de modo export
+        clonedDoc.body.classList.add('exporting');
+
+        // 1) Elimina todos los <link rel="stylesheet"> y TODOS los <style>
+        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
+        clonedDoc.querySelectorAll('style').forEach(n => n.remove());
+
+        // 2) Limpia estilos inline problemáticos (oklch / color-mix / gradients)
+        const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
+        clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
+          const inl = el.getAttribute('style') || '';
+          if (BAD_PAT.test(inl)) el.removeAttribute('style');
+          // Asegura fondo y variables más usadas
+          (el as HTMLElement).style.setProperty('--background', '#ffffff');
+          (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
+        });
+
+        // 3) Inyecta un reset plano y seguro
+        const safe = clonedDoc.createElement('style');
+        safe.textContent = `
+          /* Reset total para evitar funciones CSS no soportadas por html2canvas */
+          * {
+            background: #ffffff !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            border-color: #e5e7eb !important;
+            color: #111827 !important;
+          }
+          body, ion-content { --background: #ffffff !important; }
+          #reportArea, ion-card, .kpi, .resumen p, .resumen ul, .resumen ul li, .table-responsive {
+            background: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+          }
+          .charts canvas { background: #ffffff !important; }
+        `;
+        clonedDoc.head.appendChild(safe);
+      },
+    });
+
     const imgData = canvas.toDataURL('image/png');
-
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     const imgProps = (pdf as any).getImageProperties(imgData);
-    const pdfWidth = pageWidth - 10;
+    const margin = 5;
+    const pdfWidth = pageWidth - margin * 2;
     const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-    let position = 5;
+    let position = margin;
     let heightLeft = pdfHeight;
 
-    pdf.addImage(imgData, 'PNG', 5, position, pdfWidth, pdfHeight, '', 'FAST');
+    pdf.addImage(imgData, 'PNG', margin, position, pdfWidth, pdfHeight, '', 'FAST');
     heightLeft -= pageHeight;
 
     while (heightLeft > -pageHeight) {
       pdf.addPage();
       position = 0;
-      pdf.addImage(imgData, 'PNG', 5, position - (pdfHeight - heightLeft), pdfWidth, pdfHeight, '', 'FAST');
+      pdf.addImage(imgData, 'PNG', margin,
+        position - (pdfHeight - heightLeft), pdfWidth, pdfHeight, '', 'FAST');
       heightLeft -= pageHeight;
     }
 
     pdf.save(this.suggestedPdfName());
+  } catch (err) {
+    console.error('Error al exportar PDF:', err);
+    alert('No se pudo exportar el PDF. Se limpió el clon, prueba nuevamente.');
   }
+}
+
 
   private suggestedPdfName(): string {
     const today = new Date();
