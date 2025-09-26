@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent
+  IonCard, IonCardHeader, IonCardTitle, IonCardContent
 } from '@ionic/angular/standalone';
 
 export type Registro = {
@@ -34,7 +34,7 @@ export type Registro = {
   standalone: true,
   imports: [
     CommonModule,
-    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent
+    IonCard, IonCardHeader, IonCardTitle, IonCardContent
   ]
 })
 export class RegistrosComponent {

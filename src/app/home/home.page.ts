@@ -372,4 +372,142 @@ private suggestedImageName(format: 'png' | 'jpeg'): string {
 }
 
   ngOnDestroy(): void {}
+
+async exportPDF() {
+  const container = document.getElementById('reportArea');
+  if (!container) return;
+
+  try {
+    await this.nextFrame();
+
+    // 1) Render a canvas "limpio" (igual que tu exportImage)
+    const canvas = await html2canvas(container, {
+      scale: window.devicePixelRatio || 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      onclone: (clonedDoc) => {
+        clonedDoc.body.classList.add('exporting');
+        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
+        clonedDoc.querySelectorAll('style').forEach(n => n.remove());
+        const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
+        clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
+          const inl = el.getAttribute('style') || '';
+          if (BAD_PAT.test(inl)) el.removeAttribute('style');
+          (el as HTMLElement).style.setProperty('--background', '#ffffff');
+          (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
+        });
+        const safe = clonedDoc.createElement('style');
+        safe.textContent = `
+          * { background:#fff !important; background-image:none !important; box-shadow:none !important; text-shadow:none !important; border-color:#e5e7eb !important; color:#111827 !important; }
+          body, ion-content { --background:#fff !important; }
+          #reportArea, ion-card, .resumen p, .resumen ul, .resumen li, .table-responsive { background:#fff !important; border:1px solid #e5e7eb !important; }
+        `;
+        clonedDoc.head.appendChild(safe);
+      },
+    });
+
+    // 2) PDF base
+    const autoOrientation: 'p' | 'l' = canvas.width >= canvas.height ? 'l' : 'p';
+    const pdf = new jsPDF({ orientation: autoOrientation, unit: 'mm', format: 'a4' });
+
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const marginMM = 10;
+    const usableWmm = pageW - marginMM * 2;
+    const imgWmm = usableWmm;
+    const imgHmm = (canvas.height * imgWmm) / canvas.width;
+
+    // Relación px <-> mm sobre la imagen ya escalada
+    const pxPerMM = canvas.height / imgHmm;
+    const usableHPx = (pageH - marginMM * 2) * pxPerMM; // alto útil de una página, en px del canvas
+
+    // 3) Calcula "cortes seguros" a partir de la DOM real
+    //    - final de cada ion-card
+    //    - final de cada elemento con .no-split
+    //    - (puedes añadir más selectores si quieres granularidad)
+    const containerRect = container.getBoundingClientRect();
+    const getBottom = (el: Element) => {
+      const r = (el as HTMLElement).getBoundingClientRect();
+      return (r.bottom - containerRect.top); // px relativos al inicio de reportArea (igual sistema que canvas)
+    };
+
+    const selectors = [
+      '#reportArea > ion-card',
+      '.no-split',
+      'ion-card',
+      '.resumen li',
+    ];
+    const candidates = Array.from(container.querySelectorAll(selectors.join(',')))
+      .map(getBottom)
+      .filter(y => y > 0 && y < canvas.height)
+      .sort((a, b) => a - b);
+
+    // Evita duplicados muy juntos (ruido)
+    const uniqueBreaks: number[] = [];
+    const MIN_GAP = 24; // px
+    for (const y of candidates) {
+      if (!uniqueBreaks.length || Math.abs(y - uniqueBreaks[uniqueBreaks.length - 1]) > MIN_GAP) {
+        uniqueBreaks.push(Math.round(y));
+      }
+    }
+
+    // 4) Parte el canvas en "rebanadas" que terminen en el corte seguro más cercano hacia atrás
+    const slices: Array<{ y: number; h: number; }> = [];
+    let y = 0;
+    const TOLERANCE = 32;   // px hacia atrás que aceptamos para "ajustar" al corte seguro
+    const MIN_SLICE = 120;  // evita páginas casi vacías
+
+    while (y < canvas.height) {
+      const target = y + usableHPx;
+      // Busca el corte seguro más cercano <= target y >= y+MIN_SLICE
+      const candidatesInWindow = uniqueBreaks.filter(b => b <= target && b >= y + MIN_SLICE);
+      let end = candidatesInWindow.length ? candidatesInWindow[candidatesInWindow.length - 1] : target;
+
+      // Si el mejor corte seguro nos queda demasiado lejos (no encontrado o queda muy arriba), usa target
+      if ((target - end) > TOLERANCE) end = target;
+
+      // Asegura no exceder
+      if (end > canvas.height) end = canvas.height;
+
+      const h = Math.max(1, Math.round(end - y));
+      slices.push({ y, h });
+      y = end;
+    }
+
+    // 5) Añade cada "slice" como página separada, sin mover una imagen gigante:
+    const img = canvas; // original
+    const tmp = document.createElement('canvas');
+    const tctx = tmp.getContext('2d')!;
+
+    for (let i = 0; i < slices.length; i++) {
+      const { y: sy, h: sh } = slices[i];
+
+      tmp.width = img.width;
+      tmp.height = sh;
+      tctx.clearRect(0, 0, tmp.width, tmp.height);
+      tctx.drawImage(img, 0, sy, img.width, sh, 0, 0, tmp.width, sh);
+
+      const sliceHmm = sh / pxPerMM; // alto en mm de esta rebanada
+      const data = tmp.toDataURL('image/png', 1);
+
+      if (i > 0) pdf.addPage();
+      pdf.addImage(data, 'PNG', marginMM, marginMM, imgWmm, sliceHmm, undefined, 'FAST');
+    }
+
+    pdf.save(this.suggestedPdfName());
+  } catch (err) {
+    console.error('Error al exportar PDF:', err);
+    alert('No se pudo exportar el PDF. Intenta nuevamente.');
+  }
+}
+
+private suggestedPdfName(): string {
+  const today = new Date();
+  const fmt = (n: number) => String(n).padStart(2, '0');
+  const fecha = `${today.getFullYear()}-${fmt(today.getMonth() + 1)}-${fmt(today.getDate())}`;
+  const ub = this.filters.ubicacion || 'Todas';
+  return `Reporte_Camaras_${ub}_${fecha}.pdf`;
+}
+
 }

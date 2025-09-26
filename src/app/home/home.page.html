@@ -7,7 +7,10 @@
   <ion-icon name="image-outline" slot="start"></ion-icon>
   Exportar imagen
 </ion-button>
-
+<ion-button color="tertiary" (click)="exportPDF()" [disabled]="!parsed">
+    <ion-icon name="document-outline" slot="start"></ion-icon>
+    Exportar PDF
+  </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
