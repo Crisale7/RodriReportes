@@ -1,440 +1,591 @@
-import { Component, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
+import {
+  IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
+  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+  IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon
+} from '@ionic/angular/standalone';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import {
-  IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton, IonIcon,
-  IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle,
-  IonItem, IonLabel, IonSelect, IonSelectOption, IonText, IonAccordion, IonAccordionGroup, IonNote, IonList
-} from '@ionic/angular/standalone';
 
-import { NgApexchartsModule } from 'ng-apexcharts';
-import type {
-  ApexAxisChartSeries, ApexChart, ApexXAxis, ApexPlotOptions, ApexDataLabels, ApexTooltip, ApexYAxis,
-  ApexNonAxisChartSeries, ApexLegend, ApexFill, ApexStroke, ApexGrid
-} from 'ng-apexcharts';
-
+// CSV parse robusto
 import Papa from 'papaparse';
+
+// Chart.js (auto registra controllers/escalas)
+import Chart from 'chart.js/auto';
+
+// Exportación a PDF (pantalla completa seleccionada)
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-// —— Normaliza encabezados (quita NBSP y espacios múltiples) —— //
-const norm = (s: string) => (s || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-
-// —— Encabezados del CSV "oficial" —— //
-const COL = {
-  id: 'Id',
-  inicio: 'Hora de inicio',
-  fin: 'Hora de finalización',
-  email: 'Correo electrónico',
-  nombre: 'Nombre',
-  ubicacion: 'Ubicación',
-  encargadoAlt: 'Nombre del Encargado1',
-  fecha: 'Fecha del Reporte',
-  totalAlt: '¿Cuántas cámaras en total están instaladas en la Ubicación?1',
-  operativasCat: '¿Cuántas cámaras están operativas hoy?1',
-  momento: 'Momento de Verificación de Cámaras',
-  fallosReportados: 'Indicar fallo y el tipo de fallo en las cámaras, de lo contrario ingresa "Sin Observaciones"',
-  fallosReportadosNBSP: 'Indicar\u00a0 fallo y el tipo de fallo en las cámaras, de lo contrario ingresa "Sin Observaciones"',
-  camarasConFalla: 'Detalla qué cámaras son las que presentan fallas, ubicación, nombre, modelo.',
-  fallaTecnica1: '¿Se detectaron fallas técnicas generales en el sistema?\u00a0\u00a01',
-  fallaTecnicaNB: '¿Se detectaron fallas técnicas generales en el sistema?\u00a0\u00a0',
-  malaCalidad: '¿Se detectaron cámaras con mala calidad de imagen, obstruidas o con interferencias?',
-  nFallasImagen: 'Indicar el número de cámaras que se encuentran con el fallo, de lo contrario ingresa "0"',
-  detalleFallo: 'Indicar la Serie de las cámaras con fallo y el tipo de fallo en cada una , de lo contrario ingresa "Sin Observaciones"',
-  adjuntos: 'Adjuntar Imágenes o Documentos del Fallo y/o Observaciones',
-  cortes: '¿Hubo cortes de energía o fallos en la red o sistema?',
-  observaciones: 'Observaciones que Pudiste Encontrar acerca del Monitoreo',
-  observaciones1: 'Observaciones que Pudiste Encontrar acerca del Monitoreo1',
-  recomendaciones: '¿Alguna recomendación o sugerencia?\u00a0\u00a0',
-} as const;
-
-export type Row = {
-  id?: string; fecha: Date; ubicacion: string; nombre?: string; encargado?: string; momento?: string;
-  total: number; operativas: number; noOperativas: number;
-  operativasCat?: string;
-  fallasImagen: number; malaCalidad?: string;
-  fallosReportados?: string; camarasConFalla?: string; detalleFallo?: string;
-  fallaTecnica?: string; cortes?: string; observaciones?: string; recomendaciones?: string;
+type Registro = {
+  id: string;
+  horaInicio: string;
+  horaFin: string;
+  correo: string;
+  nombre: string;
+  ubicacion: string;
+  encargado: string;
+  fechaReporte: Date | null;
+  momento: string;
+  totalCamaras: number;
+  operativasHoy: string;
+  malaCalidad?: string;
+  camsConFalla: number;
+  detalleFallas?: string;
+  fallaTipo?: string;
+  fallasGenerales?: string;
+  observaciones?: string;
   adjuntos?: string;
+  recomendacion?: string;
+  raw?: any;
 };
 
 @Component({
   selector: 'app-home',
-  standalone: true,
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
+  standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton, IonIcon,
-    IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle,
-    IonItem, IonLabel, IonSelect, IonSelectOption, IonText, IonAccordion, IonAccordionGroup, IonNote, IonList,
-    NgApexchartsModule,
-  ],
+    IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
+    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+    IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon
+  ]
 })
-export class HomePage {
+export class HomePage implements OnDestroy {
+  fileName = '';
+  parsed = false;
+
   // Datos
-  records: Row[] = [];
-  filtered: Row[] = [];
+  rows: Registro[] = [];
+  filtered: Registro[] = [];
 
   // Filtros
-  allUbicaciones: string[] = [];
-  allMomentos: string[] = [];
-  allFechas: string[] = [];        // todas las fechas disponibles (YYYY-MM-DD)
-  fechasDesde: string[] = [];      // lista para el select "Desde"
-  fechasHasta: string[] = [];      // lista para el select "Hasta"
-
   filters = {
+    // dropdowns de fecha (strings "yyyy-MM-dd")
+    fechaDesde: '' as string,
+    fechaHasta: '' as string,
+
+    // filtros existentes
+    ubicacion: '' as string,
+    encargado: '' as string,
+    momento: '' as string,
+    operativas: '' as string,
+
+    // rango calculado internamente a partir de los dropdowns
+    dateStart: null as Date | null,
+    dateEnd: null as Date | null
+  };
+
+  // Lookups
+  lookups = {
+    fechas: [] as string[],
     ubicaciones: [] as string[],
-    desde: '', // YYYY-MM-DD
-    hasta: '', // YYYY-MM-DD
-    momento: '' as string | '',
+    encargados: [] as string[],
+    momentos: [] as string[],
+    operativas: ['Todas', 'Mas de la Mitad', 'Menos de la Mitad', 'No'] as string[]
   };
 
-  // UI estado
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
-  isDragging = false;
-
-  // KPIs
-  kpis: { label: string; value: string; sub?: string }[] = [];
-
-  // Charts (Apex) — no opcionales en inputs
-  chartBar: {
-    series: ApexAxisChartSeries; chart: ApexChart; xaxis: ApexXAxis; plotOptions: ApexPlotOptions;
-    dataLabels: ApexDataLabels; tooltip: ApexTooltip; yaxis: ApexYAxis; grid: ApexGrid; colors: any[]; fill: ApexFill; stroke: ApexStroke;
-  } = {
-    series: [],
-    chart: { type: 'bar', height: 340, toolbar: { show: false }, animations: { enabled: true, speed: 500 } },
-    xaxis: { categories: [], labels: { style: { fontSize: '12px' } } },
-    yaxis: { min: 0, labels: { style: { fontSize: '12px' } } },
-    plotOptions: { bar: { horizontal: false, columnWidth: '45%', borderRadius: 6 } },
-    dataLabels: { enabled: false },
-    tooltip: { shared: true },
-    grid: { strokeDashArray: 4 },
-    colors: ['var(--ion-color-success)', 'var(--ion-color-primary)'],
-    fill: {
-      type: 'gradient',
-      gradient: { shade: 'light', type: 'vertical', shadeIntensity: 0.2, opacityFrom: 0.95, opacityTo: 0.85, stops: [0, 100] }
-    },
-    stroke: { width: 2 }
+  // Métricas + Resumen
+  metrics = {
+    totalCamaras: 0,
+    operativasInterpretadas: 0,
+    camarasConFalla: 0
   };
 
-  chartPie: {
-    series: ApexNonAxisChartSeries; chart: ApexChart; labels: string[]; legend: ApexLegend; dataLabels: ApexDataLabels; plotOptions: ApexPlotOptions; colors: any[];
-  } = {
-    series: [],
-    chart: { type: 'donut', height: 320 },
-    labels: [],
-    legend: { position: 'bottom' },
-    dataLabels: { enabled: true, style: { fontSize: '14px', fontWeight: '600' } },
-    colors: ['var(--ion-color-success)', 'var(--ion-color-danger)'],
-    plotOptions: {
-      pie: { donut: { size: '70%', labels: { show: true, total: { show: true, label: 'Total' } } } }
-    }
+  resumen = {
+    periodo: '',
+    destacados: [] as string[]
   };
 
-  // ————— Carga CSV ————— //
-  browseFiles() { this.fileInput?.nativeElement?.click(); }
-  onDragOver(e: DragEvent) { e.preventDefault(); this.isDragging = true; }
-  onDragLeave(e: DragEvent) { e.preventDefault(); this.isDragging = false; }
-  onDrop(e: DragEvent) {
-    e.preventDefault(); this.isDragging = false;
-    const file = e.dataTransfer?.files?.[0];
-    if (file && file.name.toLowerCase().endsWith('.csv')) this.parseCsvFile(file);
-  }
+  // Charts
+  private charts: Chart[] = [];
+  private fillerTextPlugin: any;
 
-  onFileSelected(ev: Event) {
-    const file = (ev.target as HTMLInputElement).files?.[0];
-    if (file) this.parseCsvFile(file);
-  }
+  constructor() {
+    // Tipografía y color por defecto para todos los charts
+    Chart.defaults.font.family = 'system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial';
+    Chart.defaults.color = '#334155'; // slate-700
 
-  parseCsvFile(file: File) {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      encoding: 'latin1',
-      complete: (res: any) => {
-        const raw = res.data as any[];
-        this.records = raw.map((row) => this.mapRow(row)).filter(r => !!r) as Row[];
-        this.records.sort((a, b) => +a.fecha - +b.fecha); // primero ascendente para fechas únicas correctas
-        this.setupFilters();
-        this.applyFilters();
-      },
-      error: (err: unknown) => {
-        console.error(err);
-        alert('No se pudo leer el CSV. Verifica el archivo.');
-      }
-    });
-  }
-
-  // ————— Helpers CSV ————— //
-  private getVal(row: any, ...keys: string[]) {
-    for (const key of keys) {
-      const found = Object.keys(row).find(h => norm(h) === norm(key));
-      if (found) return row[found];
-    }
-    return undefined;
-  }
-
-  // Maneja ISO, dd/mm/yyyy, dd-mm-yyyy
-  private parseDateAny(x: any): Date | undefined {
-    if (!x) return undefined;
-    const s = String(x).trim();
-
-    const dIso = new Date(s);
-    if (!isNaN(+dIso)) return dIso;
-
-    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-    if (m) {
-      const dd = +m[1], mm = +m[2], yyyy = +((m[3].length === 2) ? ('20' + m[3]) : m[3]);
-      // UTC para evitar desfaces por tz
-      return new Date(Date.UTC(yyyy, mm - 1, dd));
-    }
-    return undefined;
-  }
-
-  // Números con miles/decimales mixtos
-  private toNum(x: any): number {
-    const s = String(x ?? '').replace(/\u00a0/g, ' ').trim();
-    if (!s) return 0;
-    let t = s.replace(/[^0-9,.\-]/g, '');
-
-    if (t.includes(',') && t.includes('.')) {
-      const lastComma = t.lastIndexOf(',');
-      const lastDot = t.lastIndexOf('.');
-      if (lastComma > lastDot) {
-        t = t.replace(/\./g, '').replace(',', '.');
-      } else {
-        t = t.replace(/,/g, '');
-      }
-    } else if (t.includes(',')) {
-      t = t.replace(/\./g, '').replace(',', '.');
-    }
-    const n = Number(t);
-    return isNaN(n) ? 0 : n;
-  }
-
-  private estimateOperativas(cat: string | number | undefined, total: number): number {
-    const n = Number(cat);
-    if (!isNaN(n) && isFinite(n)) return Math.min(Math.max(0, Math.round(n)), total);
-
-    const s = String(cat || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const m = s.match(/(\d{1,3})\s*%/);
-    if (m) {
-      const p = Math.max(0, Math.min(100, Number(m[1])));
-      return Math.round((p / 100) * total);
-    }
-
-    const includes = (k: string) => s.includes(k);
-    let ratio = 0.5;
-    if (includes('toda')) ratio = 1.0;
-    else if (includes('ningun')) ratio = 0.0;
-    else if (includes('mas de la mitad') || (includes('mitad') && includes('mas'))) ratio = 0.75;
-    else if (includes('menos de la mitad') || (includes('mitad') && includes('menos'))) ratio = 0.25;
-    else if (includes('casi toda')) ratio = 0.9;
-    else if (includes('casi ningun')) ratio = 0.1;
-
-    return Math.round(total * ratio);
-  }
-
-  private mapRow(row: any): Row | null {
-    const fechaRaw = this.getVal(row, COL.fecha);
-    const fecha = this.parseDateAny(fechaRaw);
-
-    const ubicacion = (String(this.getVal(row, COL.ubicacion) ?? '')).replace(/\u00a0/g,' ').trim();
-    const total = this.toNum(this.getVal(row, COL.totalAlt));
-
-    if (!fecha || !ubicacion) return null;
-
-    const operCat = this.getVal(row, COL.operativasCat);
-    const oper = this.estimateOperativas(operCat, total);
-    const noOp = Math.max(0, total - oper);
-
-    const observ = String(this.getVal(row, COL.observaciones) ?? this.getVal(row, COL.observaciones1) ?? '');
-    const fallaTec = String(this.getVal(row, COL.fallaTecnica1) ?? this.getVal(row, COL.fallaTecnicaNB) ?? '');
-    const fallosTxt = String(this.getVal(row, COL.fallosReportados) ?? this.getVal(row, COL.fallosReportadosNBSP) ?? '');
-
-    return {
-      id: String(this.getVal(row, COL.id) ?? ''),
-      fecha,
-      ubicacion,
-      nombre: String(this.getVal(row, COL.nombre) ?? ''),
-      encargado: String(this.getVal(row, COL.encargadoAlt) ?? ''),
-      momento: String(this.getVal(row, COL.momento) ?? ''),
-
-      total,
-      operativas: oper,
-      noOperativas: noOp,
-      operativasCat: String(operCat ?? ''),
-
-      malaCalidad: String(this.getVal(row, COL.malaCalidad) ?? ''),
-      fallasImagen: this.toNum(this.getVal(row, COL.nFallasImagen) ?? 0),
-
-      fallosReportados: fallosTxt,
-      camarasConFalla: String(this.getVal(row, COL.camarasConFalla) ?? ''),
-      detalleFallo: String(this.getVal(row, COL.detalleFallo) ?? ''),
-
-      fallaTecnica: fallaTec,
-      cortes: String(this.getVal(row, COL.cortes) ?? ''),
-      observaciones: observ,
-      recomendaciones: String(this.getVal(row, COL.recomendaciones) ?? ''),
-      adjuntos: String(this.getVal(row, COL.adjuntos) ?? ''),
-    };
-  }
-
-  // ————— Filtros & fechas disponibles ————— //
-  setupFilters() {
-    this.allUbicaciones = Array.from(new Set(this.records.map(r => r.ubicacion))).sort();
-    this.allMomentos = Array.from(new Set(this.records.map(r => r.momento).filter(Boolean) as string[])).sort();
-
-    // Fechas únicas disponibles (YYYY-MM-DD)
-    const fechasSet = new Set<string>(this.records.map(r => this.toISODate(r.fecha)));
-    this.allFechas = Array.from(fechasSet).sort(); // ascendente
-
-    this.filters.desde = this.allFechas[0] ?? '';
-    this.filters.hasta = this.allFechas[this.allFechas.length - 1] ?? '';
-
-    this.fechasDesde = [...this.allFechas];
-    this.updateFechasHasta();
-  }
-
-  private updateFechasHasta() {
-    this.fechasHasta = this.allFechas.filter(d => d >= this.filters.desde);
-    if (!this.fechasHasta.includes(this.filters.hasta)) {
-      this.filters.hasta = this.fechasHasta[this.fechasHasta.length - 1] ?? this.filters.desde;
-    }
-  }
-
-  onDesdeSelect(ev: CustomEvent) {
-    this.filters.desde = (ev.detail as any).value;
-    this.updateFechasHasta();
-    this.applyFilters();
-  }
-  onHastaSelect(ev: CustomEvent) {
-    this.filters.hasta = (ev.detail as any).value;
-    if (this.filters.hasta < this.filters.desde) this.filters.hasta = this.filters.desde;
-    this.applyFilters();
-  }
-
-  applyFilters() {
-    const { ubicaciones, momento, desde, hasta } = this.filters;
-    const d0 = desde ? new Date(desde) : undefined;
-    const d1 = hasta ? new Date(hasta + 'T23:59:59') : undefined;
-
-    this.filtered = this.records.filter(r => {
-      const okU = !ubicaciones?.length || ubicaciones.includes(r.ubicacion);
-      const okM = !momento || r.momento === momento;
-      const okD = (!d0 || r.fecha >= d0) && (!d1 || r.fecha <= d1);
-      return okU && okM && okD;
-    });
-
-    this.computeKPIs();
-    this.updateCharts();
-  }
-
-  private toISODate(d: Date) {
-    const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-    return z.toISOString().slice(0, 10);
-  }
-
-  // ————— KPIs ————— //
-  private computeKPIs() {
-    const total = this.filtered.reduce((s, r) => s + r.total, 0);
-    const oper = this.filtered.reduce((s, r) => s + r.operativas, 0);
-    const noOp = Math.max(0, total - oper);
-    const uptime = total ? (oper / total) * 100 : 0;
-
-    const yes = (v: any) => ['sí', 'si'].includes(String(v).toLowerCase());
-    const fallasImg = this.filtered.reduce((s, r) => s + (r.fallasImagen || 0), 0);
-    const fallasTec = this.filtered.filter(r => yes(r.fallaTecnica) || (!!r.fallaTecnica && !/^no\b/i.test(r.fallaTecnica))).length;
-    const cortes = this.filtered.filter(r => yes(r.cortes)).length;
-    const mala = this.filtered.filter(r => yes(r.malaCalidad)).length;
-
-    this.kpis = [
-      { label: 'Cámaras totales', value: String(total) },
-      { label: 'Operativas (est.)', value: String(oper) },
-      { label: 'Uptime (est.)', value: uptime.toFixed(1) + '%' },
-      { label: 'No operativas (est.)', value: String(noOp), sub: `Fallas img: ${fallasImg} · Técnicas: ${fallasTec} · Cortes: ${cortes} · Mala calidad: ${mala}` },
-    ];
-  }
-
-  // ————— Charts ————— //
-  private updateCharts() {
-    const byU = new Map<string, { total: number; oper: number }>();
-    for (const r of this.filtered) {
-      const k = r.ubicacion;
-      const acc = byU.get(k) || { total: 0, oper: 0 };
-      acc.total += r.total; acc.oper += r.operativas; byU.set(k, acc);
-    }
-    const cats = Array.from(byU.keys());
-    const totals = cats.map(c => byU.get(c)!.total);
-    const opers  = cats.map(c => byU.get(c)!.oper);
-
-    this.chartBar = {
-      ...this.chartBar,
-      xaxis: { categories: cats, labels: { style: { fontSize: '12px' } } },
-      series: [
-        { name: 'Operativas (est.)', data: opers },
-        { name: 'Total', data: totals },
-      ],
-    };
-
-    const sumTot = totals.reduce((a,b)=>a+b,0);
-    const sumOp  = opers.reduce((a,b)=>a+b,0);
-    const sumNo  = Math.max(0, sumTot - sumOp);
-    this.chartPie = {
-      ...this.chartPie,
-      series: [sumOp, sumNo],
-      labels: ['Operativas', 'No operativas'],
-      plotOptions: {
-        pie: {
-          donut: {
-            size: '70%',
-            labels: { show: true, total: { show: true, label: 'Total', formatter: () => String(sumTot) } }
-          }
+    // Plugin para mostrar mensaje cuando no hay datos tras filtros
+    this.fillerTextPlugin = {
+      id: 'fillerText',
+      afterDraw: (chart: any) => {
+        const ds = chart.data?.datasets?.[0]?.data || [];
+        const total = Array.isArray(ds) ? ds.reduce((a: number, b: number) => a + (Number(b) || 0), 0) : 0;
+        const noLabels = !chart.data?.labels?.length;
+        if ((total === 0 && ds.length > 0) || noLabels) {
+          const { ctx, chartArea } = chart;
+          if (!chartArea) return;
+          ctx.save();
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '600 14px system-ui, -apple-system, Segoe UI, Roboto';
+          ctx.textAlign = 'center';
+          ctx.fillText('Sin datos para los filtros actuales',
+            (chartArea.left + chartArea.right) / 2,
+            (chartArea.top + chartArea.bottom) / 2
+          );
+          ctx.restore();
         }
       }
     };
-
-    // Debug opcional:
-    // console.log('[updateCharts] filtered:', this.filtered.length, 'cats:', cats, 'totals:', totals, 'opers:', opers);
   }
 
-  // ————— PDF ————— //
-  async exportToPDF() {
-    const el = document.getElementById('reportContainer');
-    if (!el) return;
-    const canvas = await html2canvas(el, { scale: 2 });
+  // ====== CARGA CSV ======
+  onFileSelected(evt: Event) {
+    const input = evt.target as HTMLInputElement;
+    if (!input.files || !input.files.length) return;
+
+    const file = input.files[0];
+    this.fileName = file.name;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const csvText = (reader.result ?? '') as string;
+
+      Papa.parse<any>(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        encoding: 'UTF-8',
+        delimiter: ',',
+        quoteChar: '"',
+        transformHeader: (h: string) => this.cleanHeader(h),
+        complete: (result: { data: any[]; errors: any[]; meta: any }) => {
+          try {
+            const data = (result.data as any[]).map((r: any) => this.mapRow(r));
+            this.rows = data.filter((d: Registro) => !!d.id || !!d.ubicacion || !!d.encargado);
+            this.parsed = true;
+
+            this.buildLookups();
+            this.resetFilters(false);
+            this.applyFilters();
+          } catch (e) {
+            console.error(e);
+            this.parsed = false;
+            alert('Error al procesar el CSV. Revisa el formato de columnas.');
+          }
+        },
+        error: (err: any) => {
+          console.error(err);
+          alert('No se pudo leer el CSV. Verifica codificación UTF-8 y separadores.');
+        }
+      });
+    };
+    reader.onerror = (e) => {
+      console.error(e);
+      alert('No se pudo abrir el archivo seleccionado.');
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  private cleanHeader(h: string): string {
+    const noBom = h.replace(/^\uFEFF/, '');
+    return noBom.trim().replace(/\s+/g, ' ').replace(/_/g, ' ').toLowerCase();
+  }
+
+  private mapRow(r: any): Registro {
+    const get = (keys: string[], def: any = '') => {
+      for (const k of keys) {
+        const kk = k.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(r, kk) && r[kk] != null) return String(r[kk]).trim();
+      }
+      return def;
+    };
+
+    const fechaRaw = get(['fecha del reporte', 'fecha reporte', 'fecha']);
+    const fecha = this.parseDate(fechaRaw);
+
+    const totalCams = this.toNumber(get([
+      '¿cuántas cámaras en total están instaladas en la ubicación?',
+      'cuantas camaras en total estan instaladas en la ubicacion?',
+      'cámaras totales', 'total camaras', 'total cámaras'
+    ]), 0);
+
+    const camsFalla = this.toNumber(get([
+      'indicar el número de cámaras que se encuentran con el fallo, de lo contrario ingresa "0"',
+      'indicar el numero de camaras que se encuentran con el fallo, de lo contrario ingresa "0"',
+      'cámaras con falla', 'camaras con falla'
+    ]), 0);
+
+    return {
+      id: get(['id']),
+      horaInicio: get(['hora de inicio', 'hora inicio']),
+      horaFin: get(['hora de finalización', 'hora de finalizacion', 'hora fin']),
+      correo: get(['correo electrónico', 'correo electronico', 'email']),
+      nombre: get(['nombre']),
+      ubicacion: get(['ubicación', 'ubicacion']),
+      encargado: get(['nombre del encargado', 'encargado']),
+      fechaReporte: fecha,
+      momento: get(['momento de verificación de cámaras', 'momento de verificacion de camaras', 'momento']),
+      totalCamaras: totalCams,
+      operativasHoy: get(['¿cuántas cámaras están operativas hoy?', 'cuantas camaras estan operativas hoy?', 'operativas hoy']),
+      malaCalidad: get(['¿se detectaron cámaras con mala calidad de imagen, obstruidas o con interferencias?', 'se detectaron camaras con mala calidad de imagen, obstruidas o con interferencias?']),
+      camsConFalla: camsFalla,
+      detalleFallas: get(['detalla qué cámaras son las que presentan fallas, ubicación, nombre, modelo.', 'detalla que camaras son las que presentan fallas, ubicacion, nombre, modelo.']),
+      fallaTipo: get(['indicar  fallo y el tipo de fallo en las cámaras, de lo contrario ingresa "sin observaciones"', 'indicar fallo y el tipo de fallo en las camaras, de lo contrario ingresa "sin observaciones"']),
+      fallasGenerales: get(['¿se detectaron fallas técnicas generales en el sistema?', 'se detectaron fallas tecnicas generales en el sistema?']),
+      observaciones: get(['observaciones que pudiste encontrar acerca del monitoreo', 'observaciones']),
+      adjuntos: get(['adjuntar imágenes o documentos del fallo y/o observaciones', 'adjuntar imagenes o documentos del fallo y/o observaciones', 'adjuntos']),
+      recomendacion: get(['¿alguna recomendación o sugerencia?', 'alguna recomendacion o sugerencia?']),
+      raw: r
+    };
+  }
+
+  private parseDate(v: string): Date | null {
+    if (!v) return null;
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d;
+    const m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (m) {
+      const mm = parseInt(m[1], 10) - 1;
+      const dd = parseInt(m[2], 10);
+      const yy = parseInt(m[3], 10);
+      const dt = new Date(yy, mm, dd);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+    return null;
+  }
+
+  private toNumber(v: string, def = 0): number {
+    if (!v) return def;
+    const n = Number(String(v).replace(/[^\d.-]/g, ''));
+    return isNaN(n) ? def : n;
+  }
+
+  // ====== LOOKUPS (incluye fechas únicas para dropdowns) ======
+  private buildLookups() {
+    const uniq = (arr: (string | undefined | null)[]) => [...new Set(arr.filter((x): x is string => !!x))];
+
+    // Fechas únicas a partir de fechaReporte -> formato "yyyy-MM-dd"
+    const fechas = uniq(
+      this.rows
+        .map(r => r.fechaReporte ? this.dateToKey(r.fechaReporte) : null)
+    ).sort();
+
+    this.lookups.fechas = fechas;
+    this.lookups.ubicaciones = uniq(this.rows.map(r => r.ubicacion)).sort();
+    this.lookups.encargados = uniq(this.rows.map(r => r.encargado)).sort();
+    this.lookups.momentos = uniq(this.rows.map(r => r.momento)).sort();
+  }
+
+  private dateToKey(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private keyToDate(key: string): Date | null {
+    if (!key) return null;
+    const m = key.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10) - 1;
+    const d = parseInt(m[3], 10);
+    const dt = new Date(y, mo, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  // ====== FECHAS: handler de los dropdowns ======
+  onFechaSelectChange() {
+    this.filters.dateStart = this.filters.fechaDesde ? this.keyToDate(this.filters.fechaDesde) : null;
+    this.filters.dateEnd = this.filters.fechaHasta ? this.keyToDate(this.filters.fechaHasta) : null;
+    this.applyFilters();
+  }
+
+  // ====== FILTROS ======
+  resetFilters(apply = true) {
+    this.filters = {
+      fechaDesde: '',
+      fechaHasta: '',
+      ubicacion: '',
+      encargado: '',
+      momento: '',
+      operativas: '',
+      dateStart: null,
+      dateEnd: null
+    };
+    if (apply) this.applyFilters();
+  }
+
+  applyFilters() {
+    const inRange = (d: Date | null) => {
+      if (!d) return true;
+      if (this.filters.dateStart && d < this.stripTime(this.filters.dateStart)) return false;
+      if (this.filters.dateEnd && d > this.stripTimeEnd(this.filters.dateEnd)) return false;
+      return true;
+    };
+
+    this.filtered = this.rows.filter(r => {
+      if (this.filters.ubicacion && r.ubicacion !== this.filters.ubicacion) return false;
+      if (this.filters.encargado && r.encargado !== this.filters.encargado) return false;
+      if (this.filters.momento && r.momento !== this.filters.momento) return false;
+      if (this.filters.operativas && r.operativasHoy !== this.filters.operativas) return false;
+      if (!inRange(r.fechaReporte)) return false;
+      return true;
+    });
+
+    this.computeMetrics();
+    this.updateCharts();
+    this.buildResumen();
+  }
+
+  private stripTime(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  private stripTimeEnd(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  }
+
+  private computeMetrics() {
+    const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
+    this.metrics.totalCamaras = sum(this.filtered.map(r => r.totalCamaras || 0));
+    this.metrics.camarasConFalla = sum(this.filtered.map(r => r.camsConFalla || 0));
+
+    const ratio = (s: string) => {
+      const v = (s || '').toLowerCase();
+      if (v === 'todas') return 1;
+      if (v.includes('mas de la mitad') || v.includes('más de la mitad')) return 0.7;
+      if (v.includes('menos de la mitad')) return 0.3;
+      if (v === 'no') return 0;
+      return 0.5;
+    };
+    this.metrics.operativasInterpretadas = this.filtered
+      .map(r => Math.round((r.totalCamaras || 0) * ratio(r.operativasHoy || '')))
+      .reduce((a, b) => a + b, 0);
+  }
+
+  private buildResumen() {
+    const pStart = this.filters.dateStart ? this.dateToKey(this.filters.dateStart) : '';
+    const pEnd = this.filters.dateEnd ? this.dateToKey(this.filters.dateEnd) : '';
+    this.resumen.periodo = (pStart || pEnd) ? `${pStart || '...'} a ${pEnd || '...'}` : 'Todo';
+
+    this.resumen.destacados = this.filtered
+      .filter(r =>
+        (r.camsConFalla || 0) > 0 ||
+        /emergencia|daños|da\u00f1os|sospechosa/i.test(`${r.fallasGenerales} ${r.fallaTipo}`))
+      .slice(0, 5)
+      .map(r => `#${r.id} - ${r.ubicacion}: ${r.camsConFalla} cam(s) con falla. ${r.recomendacion || ''}`.trim());
+  }
+
+  // ====== Utils para charts ======
+  private shortLabel(label: string, max = 16): string {
+    const s = (label || '').trim();
+    if (s.length <= max) return s;
+    const cut = s.slice(0, max).lastIndexOf(' ');
+    return (cut > 8 ? s.slice(0, cut) : s.slice(0, max - 1)) + '…';
+  }
+
+  private getBaseOptions(): any {
+    return {
+      responsive: true,
+      maintainAspectRatio: false, // usa altura de canvas del SCSS
+      animation: { duration: 600, easing: 'easeOutQuart' },
+      layout: { padding: { top: 6, right: 8, bottom: 6, left: 8 } },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'center',
+          labels: {
+            usePointStyle: true,
+            pointStyle: 'rect',
+            boxWidth: 10,
+            boxHeight: 10,
+            borderRadius: 2
+          }
+        },
+        tooltip: { intersect: false, mode: 'index' }
+      }
+    };
+  }
+
+  private getBarOptions(): any {
+    const base = this.getBaseOptions();
+    return {
+      ...base,
+      plugins: { ...base.plugins, legend: { display: false } },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+            callback: (_: any, idx: number, ticks: any) => {
+              const label = (ticks[idx]?.label ?? '').toString();
+              return this.shortLabel(label, 24);
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          ticks: { precision: 0 }
+        }
+      }
+    };
+  }
+
+  private getDoughnutOptions(): any {
+    const base = this.getBaseOptions();
+    return {
+      ...base,
+      cutout: '62%',
+      plugins: {
+        ...base.plugins,
+        legend: { ...base.plugins.legend, position: 'bottom', labels: { ...base.plugins.legend.labels, padding: 10 } }
+      }
+    };
+  }
+
+  // ====== CHARTS ======
+  private destroyCharts() {
+    this.charts.forEach(c => c.destroy());
+    this.charts = [];
+  }
+
+  private updateCharts() {
+    this.destroyCharts();
+
+    // 1) Operativas vs Totales (Doughnut)
+    const ctx1 = (document.getElementById('chartOperativas') as HTMLCanvasElement)?.getContext('2d');
+    if (ctx1) {
+      const total = Math.max(this.metrics.totalCamaras, 0);
+      const op = Math.min(this.metrics.operativasInterpretadas, total);
+      const noOp = Math.max(total - op, 0);
+
+      this.charts.push(new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: ['Operativas (aprox.)', 'No operativas (aprox.)'],
+          datasets: [{ data: [op, noOp] }]
+        },
+        options: this.getDoughnutOptions(),
+        plugins: [this.fillerTextPlugin]
+      }));
+    }
+
+    // 2) Fallas por Tipo (top)
+    const fallas: Record<string, number> = {};
+    this.filtered.forEach(r => {
+      const all = `${r.fallaTipo || ''};${r.fallasGenerales || ''}`
+        .split(/[;,\t]/g)
+        .map(x => x.trim())
+        .filter(Boolean);
+      all.forEach(f => fallas[f] = (fallas[f] || 0) + 1);
+    });
+    const sortedFallas = Object.entries(fallas).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const ctx2 = (document.getElementById('chartFallasTipo') as HTMLCanvasElement)?.getContext('2d');
+    if (ctx2) {
+      this.charts.push(new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: sortedFallas.map(([k]) => this.shortLabel(k, 28)),
+          datasets: [{
+            label: 'Conteo',
+            data: sortedFallas.map(([, v]) => v),
+            borderWidth: 1,
+            borderRadius: 6,
+            barPercentage: 0.7,
+            categoryPercentage: 0.7
+          }]
+        },
+        options: this.getBarOptions(),
+        plugins: [this.fillerTextPlugin]
+      }));
+    }
+
+    // 3) Reportes por Ubicación
+    const repUb: Record<string, number> = {};
+    this.filtered.forEach(r => { repUb[r.ubicacion] = (repUb[r.ubicacion] || 0) + 1; });
+    const ctx3 = (document.getElementById('chartReportesUbicacion') as HTMLCanvasElement)?.getContext('2d');
+    if (ctx3) {
+      const pairs = Object.entries(repUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      this.charts.push(new Chart(ctx3, {
+        type: 'bar',
+        data: {
+          labels: pairs.map(([k]) => this.shortLabel(k, 28)),
+          datasets: [{
+            label: 'Reportes',
+            data: pairs.map(([, v]) => v),
+            borderWidth: 1,
+            borderRadius: 6,
+            barPercentage: 0.7,
+            categoryPercentage: 0.7
+          }]
+        },
+        options: this.getBarOptions(),
+        plugins: [this.fillerTextPlugin]
+      }));
+    }
+
+    // 4) Cámaras con Falla por Ubicación
+    const fallaUb: Record<string, number> = {};
+    this.filtered.forEach(r => { fallaUb[r.ubicacion] = (fallaUb[r.ubicacion] || 0) + (r.camsConFalla || 0); });
+    const ctx4 = (document.getElementById('chartFallaUbicacion') as HTMLCanvasElement)?.getContext('2d');
+    if (ctx4) {
+      const pairs = Object.entries(fallaUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      this.charts.push(new Chart(ctx4, {
+        type: 'bar',
+        data: {
+          labels: pairs.map(([k]) => this.shortLabel(k, 28)),
+          datasets: [{
+            label: 'Cáms con falla',
+            data: pairs.map(([, v]) => v),
+            borderWidth: 1,
+            borderRadius: 6,
+            barPercentage: 0.7,
+            categoryPercentage: 0.7
+          }]
+        },
+        options: this.getBarOptions(),
+        plugins: [this.fillerTextPlugin]
+      }));
+    }
+  }
+
+  // ====== EXPORTAR PDF ======
+  async exportPDF() {
+    const element = document.getElementById('reportArea');
+    if (!element) return;
+
+    const canvas = await html2canvas(element, { scale: window.devicePixelRatio || 2, useCORS: true, logging: false });
     const imgData = canvas.toDataURL('image/png');
 
-    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    const imgWidth = pageWidth - 20;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const imgProps = (pdf as any).getImageProperties(imgData);
+    const pdfWidth = pageWidth - 10;
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-    let y = 10;
-    pdf.text('Reporte de Monitoreo de Cámaras', 10, y);
-    y += 6;
+    let position = 5;
+    let heightLeft = pdfHeight;
 
-    if (imgHeight < pageHeight - y) {
-      pdf.addImage(imgData, 'PNG', 10, y, imgWidth, imgHeight);
-    } else {
-      let sY = 0;
-      const pageCanvasHeight = ((pageHeight - y) * canvas.width) / imgWidth;
-      while (sY < canvas.height) {
-        const page = document.createElement('canvas');
-        page.width = canvas.width;
-        page.height = Math.min(pageCanvasHeight, canvas.height - sY);
-        const ctx = page.getContext('2d')!;
-        ctx.drawImage(canvas, 0, sY, canvas.width, page.height, 0, 0, page.width, page.height);
-        const pageImg = page.toDataURL('image/png');
-        pdf.addImage(pageImg, 'PNG', 10, y, imgWidth, (page.height * imgWidth) / page.width);
-        sY += page.height;
-        if (sY < canvas.height) { pdf.addPage(); y = 10; }
-      }
+    pdf.addImage(imgData, 'PNG', 5, position, pdfWidth, pdfHeight, '', 'FAST');
+    heightLeft -= pageHeight;
+
+    while (heightLeft > -pageHeight) {
+      pdf.addPage();
+      position = 0;
+      pdf.addImage(imgData, 'PNG', 5, position - (pdfHeight - heightLeft), pdfWidth, pdfHeight, '', 'FAST');
+      heightLeft -= pageHeight;
     }
 
-    pdf.save('reporte-camaras.pdf');
+    pdf.save(this.suggestedPdfName());
+  }
+
+  private suggestedPdfName(): string {
+    const today = new Date();
+    const fmt = (n: number) => String(n).padStart(2, '0');
+    const fecha = `${today.getFullYear()}-${fmt(today.getMonth() + 1)}-${fmt(today.getDate())}`;
+    const ub = this.filters.ubicacion || 'Todas';
+    return `Reporte_Camaras_${ub}_${fecha}.pdf`;
+  }
+
+  ngOnDestroy(): void {
+    this.destroyCharts();
   }
 }

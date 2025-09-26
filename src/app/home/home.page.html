@@ -1,8 +1,8 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>Monitoreo de Cámaras · Reporte</ion-title>
+    <ion-title>Reporte de Monitoreo de Cámaras</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="exportToPDF()" [disabled]="!records.length">
+      <ion-button color="primary" (click)="exportPDF()" [disabled]="!parsed">
         <ion-icon name="download-outline" slot="start"></ion-icon>
         Exportar PDF
       </ion-button>
@@ -11,192 +11,247 @@
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-grid class="page" [class.loaded]="filtered.length">
-    <!-- CARGA CSV -->
-    <ion-row>
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>1) Cargar archivo CSV</ion-card-title>
-            <ion-card-subtitle>
-              Usa el CSV oficial del formulario de monitoreo (mismo formato/encabezados).
-            </ion-card-subtitle>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="dropzone"
-                 (drop)="onDrop($event)"
-                 (dragover)="onDragOver($event)"
-                 (dragleave)="onDragLeave($event)"
-                 [class.dragging]="isDragging">
-              <ion-icon name="cloud-upload-outline" class="dz-icon"></ion-icon>
-              <h3>Arrastra y suelta tu CSV aquí</h3>
-              <p>o <button type="button" class="linklike" (click)="browseFiles()">explóralo en tu equipo</button></p>
-              <input #fileInput type="file" accept=".csv" (change)="onFileSelected($event)" hidden />
-            </div>
+  <div class="wrapper" id="reportArea">
 
-            <ion-text color="medium" *ngIf="!records.length">
-              <p class="hint">Aún no hay datos cargados.</p>
-            </ion-text>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
+    <!-- CARGA DE CSV -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>1) Cargar CSV</ion-card-title>
+        <ion-card-subtitle>Formato UTF-8 con comillas y saltos de línea</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <input type="file" accept=".csv,text/csv" (change)="onFileSelected($event)" />
+        <ion-note *ngIf="fileName" color="medium" class="ml-2">Archivo: {{ fileName }}</ion-note>
+        <ion-chip color="success" *ngIf="parsed" class="ml-2">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          <ion-label>CSV cargado</ion-label>
+        </ion-chip>
+      </ion-card-content>
+    </ion-card>
 
-    <!-- FILTROS -->
-    <ion-row *ngIf="records.length">
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>2) Filtros</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-row class="filters">
-              <ion-col size="12" size-md="4">
-                <ion-item>
-                  <ion-label position="stacked">Ubicaciones</ion-label>
-                  <ion-select interface="popover" [multiple]="true" placeholder="Todas"
-                              [(ngModel)]="filters.ubicaciones" (ionChange)="applyFilters()">
-                    <ion-select-option *ngFor="let u of allUbicaciones" [value]="u">{{u}}</ion-select-option>
-                  </ion-select>
-                </ion-item>
-              </ion-col>
+   <!-- FILTROS -->
+<ion-card *ngIf="parsed">
+  <ion-card-header>
+    <ion-card-title>2) Filtros</ion-card-title>
+    <ion-card-subtitle>Restringe lo que quieres mostrar en el informe</ion-card-subtitle>
+  </ion-card-header>
+  <ion-card-content>
+    <div class="filters-grid">
+      <!-- Fecha DESDE -->
+      <ion-item>
+        <ion-label position="stacked">Fecha (Desde)</ion-label>
+        <ion-select interface="popover"
+                    placeholder="Todas"
+                    [(ngModel)]="filters.fechaDesde"
+                    (ionChange)="onFechaSelectChange()">
+          <ion-select-option value="">Todas</ion-select-option>
+          <ion-select-option *ngFor="let f of lookups.fechas" [value]="f">
+            {{ f }}
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
 
-              <ion-col size="12" size-md="4">
-                <ion-item>
-                  <ion-label position="stacked">Rango de fechas</ion-label>
-                  <div class="inline-selects">
-                    <ion-select placeholder="Desde"
-                                [value]="filters.desde"
-                                (ionChange)="onDesdeSelect($event)">
-                      <ion-select-option *ngFor="let d of fechasDesde" [value]="d">{{ d }}</ion-select-option>
-                    </ion-select>
-                    <span>—</span>
-                    <ion-select placeholder="Hasta"
-                                [value]="filters.hasta"
-                                (ionChange)="onHastaSelect($event)">
-                      <ion-select-option *ngFor="let d of fechasHasta" [value]="d">{{ d }}</ion-select-option>
-                    </ion-select>
-                  </div>
-                </ion-item>
-              </ion-col>
+      <!-- Fecha HASTA -->
+      <ion-item>
+        <ion-label position="stacked">Fecha (Hasta)</ion-label>
+        <ion-select interface="popover"
+                    placeholder="Todas"
+                    [(ngModel)]="filters.fechaHasta"
+                    (ionChange)="onFechaSelectChange()">
+          <ion-select-option value="">Todas</ion-select-option>
+          <ion-select-option *ngFor="let f of lookups.fechas" [value]="f">
+            {{ f }}
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
 
-              <ion-col size="12" size-md="4">
-                <ion-item>
-                  <ion-label position="stacked">Momento</ion-label>
-                  <ion-select interface="popover" placeholder="Todos"
-                              [(ngModel)]="filters.momento" (ionChange)="applyFilters()">
-                    <ion-select-option *ngFor="let m of allMomentos" [value]="m">{{m}}</ion-select-option>
-                  </ion-select>
-                </ion-item>
-              </ion-col>
-            </ion-row>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
+      <ion-item>
+        <ion-label position="stacked">Ubicación</ion-label>
+        <ion-select interface="popover" [value]="filters.ubicacion" (ionChange)="applyFilters()" [(ngModel)]="filters.ubicacion">
+          <ion-select-option value="">Todas</ion-select-option>
+          <ion-select-option *ngFor="let u of lookups.ubicaciones" [value]="u">{{u}}</ion-select-option>
+        </ion-select>
+      </ion-item>
 
-    <!-- KPIs -->
-    <ion-row *ngIf="filtered.length">
-      <ion-col size="12" size-md="3" *ngFor="let k of kpis">
-        <ion-card class="kpi">
-          <ion-card-header>
-            <ion-card-subtitle>{{k.label}}</ion-card-subtitle>
-            <ion-card-title>{{k.value}}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content *ngIf="k.sub">{{k.sub}}</ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
+      <ion-item>
+        <ion-label position="stacked">Encargado</ion-label>
+        <ion-select interface="popover" [value]="filters.encargado" (ionChange)="applyFilters()" [(ngModel)]="filters.encargado">
+          <ion-select-option value="">Todos</ion-select-option>
+          <ion-select-option *ngFor="let e of lookups.encargados" [value]="e">{{e}}</ion-select-option>
+        </ion-select>
+      </ion-item>
 
-    <!-- CONTENIDO DEL REPORTE (para PDF) -->
-    <div id="reportContainer" *ngIf="filtered.length">
-      <ion-row>
-        <ion-col size="12" size-md="6">
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>Operatividad por Ubicación</ion-card-title>
-              <ion-card-subtitle>Operativas (estimadas) vs Total</ion-card-subtitle>
-            </ion-card-header>
-            <ion-card-content>
-              <apx-chart
-                [series]="chartBar.series"
-                [chart]="chartBar.chart"
-                [xaxis]="chartBar.xaxis"
-                [plotOptions]="chartBar.plotOptions"
-                [dataLabels]="chartBar.dataLabels"
-                [tooltip]="chartBar.tooltip"
-                [yaxis]="chartBar.yaxis"
-                [grid]="chartBar.grid"
-                [colors]="chartBar.colors"
-                [fill]="chartBar.fill"
-                [stroke]="chartBar.stroke">
-              </apx-chart>
-            </ion-card-content>
-          </ion-card>
-        </ion-col>
+      <ion-item>
+        <ion-label position="stacked">Momento</ion-label>
+        <ion-select interface="popover" [value]="filters.momento" (ionChange)="applyFilters()" [(ngModel)]="filters.momento">
+          <ion-select-option value="">Todos</ion-select-option>
+          <ion-select-option *ngFor="let m of lookups.momentos" [value]="m">{{m}}</ion-select-option>
+        </ion-select>
+      </ion-item>
 
-        <ion-col size="12" size-md="6">
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>Estado General</ion-card-title>
-              <ion-card-subtitle>Operativas vs No operativas</ion-card-subtitle>
-            </ion-card-header>
-            <ion-card-content>
-              <apx-chart
-                [series]="chartPie.series"
-                [chart]="chartPie.chart"
-                [labels]="chartPie.labels"
-                [legend]="chartPie.legend"
-                [dataLabels]="chartPie.dataLabels"
-                [plotOptions]="chartPie.plotOptions"
-                [colors]="chartPie.colors">
-              </apx-chart>
-            </ion-card-content>
-          </ion-card>
-        </ion-col>
-      </ion-row>
+      <ion-item>
+        <ion-label position="stacked">¿Operativas hoy?</ion-label>
+        <ion-select interface="popover" [value]="filters.operativas" (ionChange)="applyFilters()" [(ngModel)]="filters.operativas">
+          <ion-select-option value="">Todas</ion-select-option>
+          <ion-select-option *ngFor="let op of lookups.operativas" [value]="op">{{op}}</ion-select-option>
+        </ion-select>
+      </ion-item>
 
-      <ion-row>
-        <ion-col size="12">
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>Detalle de Observaciones</ion-card-title>
-              <ion-card-subtitle>Fallas reportadas, cámaras afectadas y evidencias</ion-card-subtitle>
-            </ion-card-header>
-            <ion-card-content>
-              <ion-accordion-group>
-                <ion-accordion *ngFor="let r of filtered; let i = index" [value]="'row'+i">
-                  <ion-item slot="header">
-                    <ion-label>
-                      <b>{{r.fecha | date:'yyyy-MM-dd'}}</b> · {{r.ubicacion}} — {{r.encargado || r.nombre || '—'}}
-                    </ion-label>
-                  </ion-item>
-                  <div class="row-detail" slot="content">
-                    <ion-list>
-                      <ion-item><ion-label>Total cámaras</ion-label><ion-note slot="end">{{r.total}}</ion-note></ion-item>
-                      <ion-item><ion-label>Operativas (estimadas)</ion-label><ion-note slot="end">{{r.operativas}}</ion-note></ion-item>
-                      <ion-item><ion-label>No operativas (estimadas)</ion-label><ion-note slot="end">{{r.noOperativas}}</ion-note></ion-item>
-                      <ion-item><ion-label>Momento</ion-label><ion-note slot="end">{{r.momento || '—'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Mala calidad / obstrucciones</ion-label><ion-note slot="end">{{r.malaCalidad || '—'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Fallas imagen (nº)</ion-label><ion-note slot="end">{{r.fallasImagen}}</ion-note></ion-item>
-                      <ion-item><ion-label>Fallos reportados</ion-label><ion-note slot="end">{{r.fallosReportados || '—'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Cámaras afectadas / detalle</ion-label><ion-note slot="end">{{r.camarasConFalla || '—'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Falla técnica (sistema)</ion-label><ion-note slot="end">{{r.fallaTecnica || 'No'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Cortes energía/red</ion-label><ion-note slot="end">{{r.cortes || 'No'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Observaciones</ion-label><ion-note slot="end">{{r.observaciones || '—'}}</ion-note></ion-item>
-                      <ion-item><ion-label>Recomendaciones</ion-label><ion-note slot="end">{{r.recomendaciones || '—'}}</ion-note></ion-item>
-                      <ion-item *ngIf="r.adjuntos">
-                        <ion-label>Evidencias</ion-label>
-                        <ion-note slot="end"><a [href]="r.adjuntos" target="_blank" rel="noopener">Ver adjuntos</a></ion-note>
-                      </ion-item>
-                    </ion-list>
-                  </div>
-                </ion-accordion>
-              </ion-accordion-group>
-            </ion-card-content>
-          </ion-card>
-        </ion-col>
-      </ion-row>
+      <div class="filter-actions">
+        <ion-button fill="outline" color="medium" (click)="resetFilters()">
+          <ion-icon name="refresh-outline" slot="start"></ion-icon>
+          Limpiar filtros
+        </ion-button>
+      </div>
     </div>
-  </ion-grid>
+  </ion-card-content>
+</ion-card>
+
+
+    <!-- MÉTRICAS RESUMEN -->
+    <ion-card *ngIf="parsed">
+      <ion-card-header>
+        <ion-card-title>3) Métricas</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="kpis">
+          <ion-card class="kpi">
+            <ion-card-content>
+              <div class="kpi-title">Reportes filtrados</div>
+              <div class="kpi-value">{{ filtered.length }}</div>
+            </ion-card-content>
+          </ion-card>
+          <ion-card class="kpi">
+            <ion-card-content>
+              <div class="kpi-title">Cámaras totales (suma filas)</div>
+              <div class="kpi-value">{{ metrics.totalCamaras }}</div>
+            </ion-card-content>
+          </ion-card>
+          <ion-card class="kpi">
+            <ion-card-content>
+              <div class="kpi-title">Cámaras operativas</div>
+              <div class="kpi-value">{{ metrics.operativasInterpretadas }}</div>
+            </ion-card-content>
+          </ion-card>
+          <ion-card class="kpi">
+            <ion-card-content>
+              <div class="kpi-title">Cámaras con fallas</div>
+              <div class="kpi-value">{{ metrics.camarasConFalla }}</div>
+            </ion-card-content>
+          </ion-card>
+        </div>
+
+        <!-- GRÁFICOS -->
+        <div class="charts">
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>Operativas vs Totales</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <canvas id="chartOperativas"></canvas>
+            </ion-card-content>
+          </ion-card>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>Fallas por Tipo (top)</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <canvas id="chartFallasTipo"></canvas>
+            </ion-card-content>
+          </ion-card>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>Reportes por Ubicación</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <canvas id="chartReportesUbicacion"></canvas>
+            </ion-card-content>
+          </ion-card>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>Cámaras con Falla por Ubicación</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <canvas id="chartFallaUbicacion"></canvas>
+            </ion-card-content>
+          </ion-card>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- RESUMEN EN TEXTO -->
+    <ion-card *ngIf="parsed">
+      <ion-card-header>
+        <ion-card-title>4) Resumen del Informe (texto)</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="resumen">
+          <p><strong>Periodo:</strong> {{ resumen.periodo }}</p>
+          <p><strong>Ubicación:</strong> {{ filters.ubicacion || 'Todas' }} | <strong>Encargado:</strong> {{ filters.encargado || 'Todos' }} | <strong>Momento:</strong> {{ filters.momento || 'Todos' }} | <strong>Operativas:</strong> {{ filters.operativas || 'Todas' }}</p>
+          <p><strong>Total reportes:</strong> {{ filtered.length }}</p>
+          <p><strong>Suma de cámaras totales:</strong> {{ metrics.totalCamaras }} |
+             <strong>Operativas (interpretado):</strong> {{ metrics.operativasInterpretadas }} |
+             <strong>Con falla declarada:</strong> {{ metrics.camarasConFalla }}</p>
+          <p *ngIf="resumen.destacados.length"><strong>Registros destacados:</strong></p>
+          <ul *ngIf="resumen.destacados.length">
+            <li *ngFor="let d of resumen.destacados">{{ d }}</li>
+          </ul>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- TABLA DE REGISTROS FILTRADOS -->
+    <ion-card *ngIf="parsed">
+      <ion-card-header>
+        <ion-card-title>5) Registros filtrados</ion-card-title>
+        <ion-card-subtitle>Como en Excel, pero solo lo relevante</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Id</th>
+                <th>Fecha Reporte</th>
+                <th>Hora inicio</th>
+                <th>Hora fin</th>
+                <th>Ubicación</th>
+                <th>Encargado</th>
+                <th>Momento</th>
+                <th>Totales</th>
+                <th>Operativas</th>
+                <th>Cámaras con falla (#)</th>
+                <th>Fallas técnicas (texto)</th>
+                <th>Observaciones</th>
+                <th>Recomendación</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of filtered">
+                <td>{{ r.id }}</td>
+                <td>{{ r.fechaReporte | date:'yyyy-MM-dd' }}</td>
+                <td>{{ r.horaInicio }}</td>
+                <td>{{ r.horaFin }}</td>
+                <td>{{ r.ubicacion }}</td>
+                <td>{{ r.encargado }}</td>
+                <td>{{ r.momento }}</td>
+                <td>{{ r.totalCamaras }}</td>
+                <td>{{ r.operativasHoy }}</td>
+                <td>{{ r.camsConFalla }}</td>
+                <td>{{ r.fallasGenerales || r.fallaTipo || 'Sin Observaciones' }}</td>
+                <td>{{ r.observaciones }}</td>
+                <td>{{ r.recomendacion }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+  </div> <!-- /reportArea -->
+
+  <div class="footer-space"></div>
 </ion-content>
