@@ -114,33 +114,18 @@
       (metricsChange)="onMetricsChange($event)">
     </app-metricas>
 
-    <!-- RESUMEN EN TEXTO -->
-    <ion-card *ngIf="parsed">
-      <ion-card-header>
-        <ion-card-title>4) Resumen del Informe (texto)</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <div class="resumen">
-          <p><strong>Periodo:</strong> {{ resumen.periodo }}</p>
-          <p>
-            <strong>Ubicación:</strong> {{ filters.ubicacion || 'Todas' }} |
-            <strong>Encargado:</strong> {{ filters.encargado || 'Todos' }} |
-            <strong>Momento:</strong> {{ filters.momento || 'Todos' }} |
-            <strong>Operativas:</strong> {{ filters.operativas || 'Todas' }}
-          </p>
-          <p><strong>Total reportes:</strong> {{ filtered.length }}</p>
-          <p>
-            <strong>Suma de cámaras totales:</strong> {{ metrics.totalCamaras }} |
-            <strong>Operativas (interpretado):</strong> {{ metrics.operativasInterpretadas }} |
-            <strong>Con falla declarada:</strong> {{ metrics.camarasConFalla }}
-          </p>
-          <p *ngIf="resumen.destacados.length"><strong>Registros destacados:</strong></p>
-          <ul *ngIf="resumen.destacados.length">
-            <li *ngFor="let d of resumen.destacados">{{ d }}</li>
-          </ul>
-        </div>
-      </ion-card-content>
-    </ion-card>
+    <!-- RESUMEN EN TEXTO (nuevo componente) -->
+    <app-resumen
+      *ngIf="parsed"
+      [periodo]="resumen.periodo"
+      [ubicacion]="filters.ubicacion"
+      [encargado]="filters.encargado"
+      [momento]="filters.momento"
+      [operativas]="filters.operativas"
+      [totalReportes]="filtered.length"
+      [metrics]="metrics"
+      [destacados]="resumen.destacados">
+    </app-resumen>
 
     <!-- TABLA DE REGISTROS FILTRADOS -->
     <ion-card *ngIf="parsed">

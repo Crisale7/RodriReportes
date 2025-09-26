@@ -1,0 +1,31 @@
+<ion-card>
+  <ion-card-header>
+    <ion-card-title>4) Resumen del Informe (texto)</ion-card-title>
+  </ion-card-header>
+
+  <ion-card-content>
+    <div class="resumen">
+      <p><strong>Periodo:</strong> {{ periodo || 'Todo' }}</p>
+
+      <p>
+        <strong>Ubicación:</strong> {{ ubicacion || 'Todas' }} |
+        <strong>Encargado:</strong> {{ encargado || 'Todos' }} |
+        <strong>Momento:</strong> {{ momento || 'Todos' }} |
+        <strong>Operativas:</strong> {{ operativas || 'Todas' }}
+      </p>
+
+      <p><strong>Total reportes:</strong> {{ totalReportes || 0 }}</p>
+
+      <p>
+        <strong>Suma de cámaras totales:</strong> {{ metrics?.totalCamaras || 0 }} |
+        <strong>Operativas (interpretado):</strong> {{ metrics?.operativasInterpretadas || 0 }} |
+        <strong>Con falla declarada:</strong> {{ metrics?.camarasConFalla || 0 }}
+      </p>
+
+      <p *ngIf="destacados?.length"><strong>Registros destacados:</strong></p>
+      <ul *ngIf="destacados?.length">
+        <li *ngFor="let d of destacados">{{ d }}</li>
+      </ul>
+    </div>
+  </ion-card-content>
+</ion-card>

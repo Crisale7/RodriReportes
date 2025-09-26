@@ -7,16 +7,12 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-// CSV
 import Papa from 'papaparse';
-
-// PDF/Imagen
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+
 import { MetricasComponent } from '../components/metricas/metricas.component';
-
-// Nuestro componente hijo
-
+import { ResumenComponent } from '../components/resumen/resumen.component';
 
 type Registro = {
   id: string;
@@ -57,18 +53,17 @@ type Metrics = {
     IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
     IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
     IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon,
-    MetricasComponent // <-- registra el componente
+    MetricasComponent,
+    ResumenComponent
   ]
 })
 export class HomePage implements OnDestroy {
   fileName = '';
   parsed = false;
 
-  // Datos
   rows: Registro[] = [];
   filtered: Registro[] = [];
 
-  // Filtros
   filters = {
     fechaDesde: '' as string,
     fechaHasta: '' as string,
@@ -80,7 +75,6 @@ export class HomePage implements OnDestroy {
     dateEnd: null as Date | null
   };
 
-  // Lookups
   lookups = {
     fechas: [] as string[],
     ubicaciones: [] as string[],
@@ -89,14 +83,12 @@ export class HomePage implements OnDestroy {
     operativas: ['Todas', 'Mas de la Mitad', 'Menos de la Mitad', 'No'] as string[]
   };
 
-  // Métricas (vienen del hijo por evento)
   metrics: Metrics = {
     totalCamaras: 0,
     operativasInterpretadas: 0,
     camarasConFalla: 0
   };
 
-  // Resumen
   resumen = {
     periodo: '',
     destacados: [] as string[]
@@ -104,7 +96,6 @@ export class HomePage implements OnDestroy {
 
   constructor() {}
 
-  // ====== CARGA CSV ======
   onFileSelected(evt: Event) {
     const input = evt.target as HTMLInputElement;
     if (!input.files || !input.files.length) return;
@@ -116,6 +107,23 @@ export class HomePage implements OnDestroy {
     reader.onload = () => {
       const csvText = (reader.result ?? '') as string;
 
+      interface PapaParseResult<T> {
+        data: T[];
+        errors: any[];
+        meta: any;
+      }
+
+      interface PapaParseConfig<T> {
+        header?: boolean;
+        skipEmptyLines?: boolean;
+        encoding?: string;
+        delimiter?: string;
+        quoteChar?: string;
+        transformHeader?: (header: string) => string;
+        complete?: (result: PapaParseResult<T>) => void;
+        error?: (error: any) => void;
+      }
+
       Papa.parse<any>(csvText, {
         header: true,
         skipEmptyLines: true,
@@ -123,9 +131,9 @@ export class HomePage implements OnDestroy {
         delimiter: ',',
         quoteChar: '"',
         transformHeader: (h: string) => this.cleanHeader(h),
-        complete: (result: { data: any[]; errors: any[]; meta: any }) => {
+        complete: (result: PapaParseResult<any>) => {
           try {
-            const data = (result.data as any[]).map((r: any) => this.mapRow(r));
+            const data: Registro[] = (result.data as any[]).map((r: any) => this.mapRow(r));
             this.rows = data.filter((d: Registro) => !!d.id || !!d.ubicacion || !!d.encargado);
             this.parsed = true;
 
@@ -142,7 +150,7 @@ export class HomePage implements OnDestroy {
           console.error(err);
           alert('No se pudo leer el CSV. Verifica codificación UTF-8 y separadores.');
         }
-      });
+      } as PapaParseConfig<any>);
     };
     reader.onerror = (e) => {
       console.error(e);
@@ -225,7 +233,6 @@ export class HomePage implements OnDestroy {
     return isNaN(n) ? def : n;
   }
 
-  // ====== LOOKUPS ======
   private buildLookups() {
     const uniq = (arr: (string | undefined | null)[]) => [...new Set(arr.filter((x): x is string => !!x))];
 
@@ -257,14 +264,12 @@ export class HomePage implements OnDestroy {
     return isNaN(dt.getTime()) ? null : dt;
   }
 
-  // ====== FECHAS: handler de dropdowns ======
   onFechaSelectChange() {
     this.filters.dateStart = this.filters.fechaDesde ? this.keyToDate(this.filters.fechaDesde) : null;
     this.filters.dateEnd = this.filters.fechaHasta ? this.keyToDate(this.filters.fechaHasta) : null;
     this.applyFilters();
   }
 
-  // ====== FILTROS ======
   resetFilters(apply = true) {
     this.filters = {
       fechaDesde: '',
@@ -296,13 +301,13 @@ export class HomePage implements OnDestroy {
       return true;
     });
 
-    // Las métricas ahora las calcula el componente hijo; aquí solo armamos el resumen.
     this.buildResumen();
   }
 
   private stripTime(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
+
   private stripTimeEnd(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
   }
@@ -320,14 +325,10 @@ export class HomePage implements OnDestroy {
       .map(r => `#${r.id} - ${r.ubicacion}: ${r.camsConFalla} cam(s) con falla. ${r.recomendacion || ''}`.trim());
   }
 
-  // ====== Evento desde <app-metricas> ======
   onMetricsChange(m: Metrics) {
     this.metrics = m;
-    // Si quieres que el resumen reaccione a cambios de métricas (no necesario hoy), descomenta:
-    // this.buildResumen();
   }
 
-  // ====== EXPORTAR PDF ======
   private nextFrame(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
