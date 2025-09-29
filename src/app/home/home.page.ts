@@ -37,6 +37,8 @@ type Metrics = {
   ]
 })
 export class HomePage implements OnDestroy {
+
+   private safeBreaksCss: number[] = []; // en px de CSS del DOM CLONADO
   fileName = '';
   parsed = false;
 
@@ -380,7 +382,8 @@ async exportPDF() {
   try {
     await this.nextFrame();
 
-    // 1) Render a canvas "limpio" (igual que tu exportImage)
+    let clonedContainerWidth = 0; // capturaremos el ancho del contenedor clonado
+
     const canvas = await html2canvas(container, {
       scale: window.devicePixelRatio || 2,
       backgroundColor: '#ffffff',
@@ -388,6 +391,8 @@ async exportPDF() {
       logging: false,
       onclone: (clonedDoc) => {
         clonedDoc.body.classList.add('exporting');
+
+        // limpieza de estilos
         clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
         clonedDoc.querySelectorAll('style').forEach(n => n.remove());
         const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
@@ -399,15 +404,57 @@ async exportPDF() {
         });
         const safe = clonedDoc.createElement('style');
         safe.textContent = `
-          * { background:#fff !important; background-image:none !important; box-shadow:none !important; text-shadow:none !important; border-color:#e5e7eb !important; color:#111827 !important; }
+          * { background:#fff !important; background-image:none !important; box-shadow:none !important;
+              text-shadow:none !important; border-color:#e5e7eb !important; color:#111827 !important; }
           body, ion-content { --background:#fff !important; }
-          #reportArea, ion-card, .resumen p, .resumen ul, .resumen li, .table-responsive { background:#fff !important; border:1px solid #e5e7eb !important; }
+          #reportArea, ion-card, .resumen p, .resumen ul, .resumen li, .table-responsive {
+            background:#fff !important; border:1px solid #e5e7eb !important;
+          }
         `;
         clonedDoc.head.appendChild(safe);
+
+        // ==== NUEVO: calcular cortes con el DOM CLONADO ====
+        const clonedContainer = clonedDoc.getElementById('reportArea') as HTMLElement | null;
+        this.safeBreaksCss = [];
+        if (clonedContainer) {
+          clonedContainerWidth = clonedContainer.clientWidth;
+
+          const containerRect = clonedContainer.getBoundingClientRect();
+          const getBottom = (el: Element) => {
+            const r = (el as HTMLElement).getBoundingClientRect();
+            return (r.bottom - containerRect.top); // px CSS relativos al inicio de reportArea clonado
+          };
+
+          const selectors = [
+            '#reportArea > ion-card',
+            '.no-split',
+            'ion-card',
+            '.resumen li'
+          ];
+          const candidates = Array
+            .from(clonedContainer.querySelectorAll(selectors.join(',')))
+            .map(getBottom)
+            .filter(y => y > 0)
+            .sort((a, b) => a - b);
+
+          // de-dup
+          const MIN_GAP = 24;
+          for (const y of candidates) {
+            if (!this.safeBreaksCss.length ||
+                Math.abs(y - this.safeBreaksCss[this.safeBreaksCss.length - 1]) > MIN_GAP) {
+              this.safeBreaksCss.push(Math.round(y));
+            }
+          }
+        }
+        // ================================================
       },
     });
 
-    // 2) PDF base
+    // ==== convertir cortes CSS -> píxeles del canvas ====
+    const scaleFactor = clonedContainerWidth ? (canvas.width / clonedContainerWidth) : 1;
+    const uniqueBreaks = this.safeBreaksCss.map(y => Math.round(y * scaleFactor));
+
+    // ===== PDF base
     const autoOrientation: 'p' | 'l' = canvas.width >= canvas.height ? 'l' : 'p';
     const pdf = new jsPDF({ orientation: autoOrientation, unit: 'mm', format: 'a4' });
 
@@ -418,77 +465,39 @@ async exportPDF() {
     const imgWmm = usableWmm;
     const imgHmm = (canvas.height * imgWmm) / canvas.width;
 
-    // Relación px <-> mm sobre la imagen ya escalada
     const pxPerMM = canvas.height / imgHmm;
-    const usableHPx = (pageH - marginMM * 2) * pxPerMM; // alto útil de una página, en px del canvas
+    const usableHPx = (pageH - marginMM * 2) * pxPerMM;
 
-    // 3) Calcula "cortes seguros" a partir de la DOM real
-    //    - final de cada ion-card
-    //    - final de cada elemento con .no-split
-    //    - (puedes añadir más selectores si quieres granularidad)
-    const containerRect = container.getBoundingClientRect();
-    const getBottom = (el: Element) => {
-      const r = (el as HTMLElement).getBoundingClientRect();
-      return (r.bottom - containerRect.top); // px relativos al inicio de reportArea (igual sistema que canvas)
-    };
-
-    const selectors = [
-      '#reportArea > ion-card',
-      '.no-split',
-      'ion-card',
-      '.resumen li',
-    ];
-    const candidates = Array.from(container.querySelectorAll(selectors.join(',')))
-      .map(getBottom)
-      .filter(y => y > 0 && y < canvas.height)
-      .sort((a, b) => a - b);
-
-    // Evita duplicados muy juntos (ruido)
-    const uniqueBreaks: number[] = [];
-    const MIN_GAP = 24; // px
-    for (const y of candidates) {
-      if (!uniqueBreaks.length || Math.abs(y - uniqueBreaks[uniqueBreaks.length - 1]) > MIN_GAP) {
-        uniqueBreaks.push(Math.round(y));
-      }
-    }
-
-    // 4) Parte el canvas en "rebanadas" que terminen en el corte seguro más cercano hacia atrás
+    // ===== slicing SIN cortar elementos
     const slices: Array<{ y: number; h: number; }> = [];
     let y = 0;
-    const TOLERANCE = 32;   // px hacia atrás que aceptamos para "ajustar" al corte seguro
-    const MIN_SLICE = 120;  // evita páginas casi vacías
+    const TOLERANCE = 32;
+    const MIN_SLICE = 120;
 
     while (y < canvas.height) {
       const target = y + usableHPx;
-      // Busca el corte seguro más cercano <= target y >= y+MIN_SLICE
       const candidatesInWindow = uniqueBreaks.filter(b => b <= target && b >= y + MIN_SLICE);
       let end = candidatesInWindow.length ? candidatesInWindow[candidatesInWindow.length - 1] : target;
 
-      // Si el mejor corte seguro nos queda demasiado lejos (no encontrado o queda muy arriba), usa target
       if ((target - end) > TOLERANCE) end = target;
-
-      // Asegura no exceder
       if (end > canvas.height) end = canvas.height;
+      if (end <= y) end = Math.min(canvas.height, y + usableHPx); // guard
 
-      const h = Math.max(1, Math.round(end - y));
-      slices.push({ y, h });
+      slices.push({ y, h: Math.max(1, Math.round(end - y)) });
       y = end;
     }
 
-    // 5) Añade cada "slice" como página separada, sin mover una imagen gigante:
-    const img = canvas; // original
     const tmp = document.createElement('canvas');
     const tctx = tmp.getContext('2d')!;
 
     for (let i = 0; i < slices.length; i++) {
       const { y: sy, h: sh } = slices[i];
-
-      tmp.width = img.width;
+      tmp.width = canvas.width;
       tmp.height = sh;
       tctx.clearRect(0, 0, tmp.width, tmp.height);
-      tctx.drawImage(img, 0, sy, img.width, sh, 0, 0, tmp.width, sh);
+      tctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, tmp.width, sh);
 
-      const sliceHmm = sh / pxPerMM; // alto en mm de esta rebanada
+      const sliceHmm = sh / pxPerMM;
       const data = tmp.toDataURL('image/png', 1);
 
       if (i > 0) pdf.addPage();
@@ -501,6 +510,7 @@ async exportPDF() {
     alert('No se pudo exportar el PDF. Intenta nuevamente.');
   }
 }
+
 
 private suggestedPdfName(): string {
   const today = new Date();
