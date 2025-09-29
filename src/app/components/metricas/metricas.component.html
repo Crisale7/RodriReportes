@@ -3,6 +3,20 @@
     <ion-card-title>3) Métricas</ion-card-title>
   </ion-card-header>
   <ion-card-content>
+    <!-- Control de visibilidad -->
+    <ion-card>
+      <ion-card-content>
+        <ion-item lines="none">
+          <ion-checkbox
+            slot="start"
+            [(ngModel)]="ocultarUbicacionCharts"
+            (ionChange)="onToggleUbicacionCharts()"
+          ></ion-checkbox>
+          <ion-label>Ocultar gráficos por ubicación</ion-label>
+        </ion-item>
+      </ion-card-content>
+    </ion-card>
+
     <!-- KPIs -->
     <div class="kpis">
       <ion-card class="kpi">
@@ -57,7 +71,8 @@
         </ion-card-content>
       </ion-card>
 
-      <ion-card>
+      <!-- Reportes por Ubicación (ocultable) -->
+      <ion-card *ngIf="!ocultarUbicacionCharts">
         <ion-card-header>
           <ion-card-title>Reportes por Ubicación</ion-card-title>
         </ion-card-header>
@@ -69,7 +84,8 @@
         </ion-card-content>
       </ion-card>
 
-      <ion-card>
+      <!-- Cámaras con Falla por Ubicación (ocultable) -->
+      <ion-card *ngIf="!ocultarUbicacionCharts">
         <ion-card-header>
           <ion-card-title>Cámaras con Falla por Ubicación</ion-card-title>
         </ion-card-header>

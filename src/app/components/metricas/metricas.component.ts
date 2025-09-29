@@ -4,8 +4,10 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  IonCard, IonCardHeader, IonCardTitle, IonCardContent
+  IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+  IonItem, IonLabel, IonCheckbox
 } from '@ionic/angular/standalone';
+import { FormsModule } from '@angular/forms';
 
 import Chart from 'chart.js/auto';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
@@ -38,7 +40,12 @@ type Metrics = {
 @Component({
   selector: 'app-metricas',
   standalone: true,
-  imports: [CommonModule, IonCard, IonCardHeader, IonCardTitle, IonCardContent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+    IonItem, IonLabel, IonCheckbox
+  ],
   templateUrl: './metricas.component.html',
   styleUrls: ['./metricas.component.scss'],
 })
@@ -48,6 +55,9 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
 
   // Todas las métricas derivadas EXCLUSIVAMENTE de datos reales
   metrics: Metrics = { totalCamaras: 0, operativasInterpretadas: 0, camarasConFalla: 0 };
+
+  // Estado UI: ocultar/mostrar gráficos por ubicación
+  ocultarUbicacionCharts = false;
 
   @ViewChild('chartOperativas') chartOperativasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('chartMomento') chartMomentoRef!: ElementRef<HTMLCanvasElement>;
@@ -72,6 +82,12 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyCharts();
+  }
+
+  // Handler del checkbox/toggle
+  onToggleUbicacionCharts() {
+    // Redibujamos para crear/destruir solo los charts visibles
+    queueMicrotask(() => this.updateCharts());
   }
 
   // ============================
@@ -182,13 +198,13 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
       }));
     }
 
-    // 3) Reportes por Ubicación (conteo real)
-    const repUb: Record<string, number> = {};
-    this.filtered.forEach(r => { repUb[r.ubicacion] = (repUb[r.ubicacion] || 0) + 1; });
-    const pairsRepUb = Object.entries(repUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
+    // 3) Reportes por Ubicación (conteo real) — solo si está visible
     const c3 = this.chartReportesUbicacionRef?.nativeElement?.getContext('2d');
-    if (c3) {
+    if (!this.ocultarUbicacionCharts && c3) {
+      const repUb: Record<string, number> = {};
+      this.filtered.forEach(r => { repUb[r.ubicacion] = (repUb[r.ubicacion] || 0) + 1; });
+      const pairsRepUb = Object.entries(repUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
       this.charts.push(new Chart(c3, {
         type: 'bar',
         data: {
@@ -199,16 +215,16 @@ export class MetricasComponent implements OnInit, OnChanges, OnDestroy {
       }));
     }
 
-    // 4) Cámaras con Falla por Ubicación (suma real de `camsConFalla`)
-    const fallaUb: Record<string, number> = {};
-    this.filtered.forEach(r => {
-      const f = Number(r.camsConFalla) || 0;
-      fallaUb[r.ubicacion] = (fallaUb[r.ubicacion] || 0) + f;
-    });
-    const pairsFallaUb = Object.entries(fallaUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
+    // 4) Cámaras con Falla por Ubicación — solo si está visible
     const c4 = this.chartFallaUbicacionRef?.nativeElement?.getContext('2d');
-    if (c4) {
+    if (!this.ocultarUbicacionCharts && c4) {
+      const fallaUb: Record<string, number> = {};
+      this.filtered.forEach(r => {
+        const f = Number(r.camsConFalla) || 0;
+        fallaUb[r.ubicacion] = (fallaUb[r.ubicacion] || 0) + f;
+      });
+      const pairsFallaUb = Object.entries(fallaUb).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
       this.charts.push(new Chart(c4, {
         type: 'bar',
         data: {
