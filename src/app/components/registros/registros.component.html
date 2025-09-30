@@ -24,6 +24,22 @@
           <div class="kv"><span class="k">Operativas</span><span class="v">{{ r.operativasHoy || '—' }}</span></div>
           <div class="kv"><span class="k">Con falla (#)</span><span class="v strong">{{ r.camsConFalla }}</span></div>
 
+          <!-- ✅ NUEVO BLOQUE PARA DETALLE DE CÁMARAS CON FALLA -->
+         <div class="kv kv-span">
+  <span class="k">Detalle de cámaras con falla</span>
+  <span class="v">
+    <ng-container *ngIf="r.detalleFallas; else noFallas">
+      <ul class="detalle-fallas">
+        <li *ngFor="let item of splitDetalle(r.detalleFallas)">
+          {{ item }}
+        </li>
+      </ul>
+    </ng-container>
+    <ng-template #noFallas>—</ng-template>
+  </span>
+</div>
+
+
           <div class="kv kv-span"><span class="k">Fallas técnicas (texto)</span><span class="v">{{ r.fallasGenerales || r.fallaTipo || 'Sin Observaciones' }}</span></div>
           <div class="kv kv-span"><span class="k">Observaciones</span><span class="v">{{ r.observaciones || '—' }}</span></div>
           <div class="kv kv-span"><span class="k">Recomendación</span><span class="v">{{ r.recomendacion || '—' }}</span></div>

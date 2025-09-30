@@ -1,19 +1,20 @@
 import { Component, OnDestroy } from '@angular/core';
 import {
-  IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+  IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
+  IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon
 } from '@ionic/angular/standalone';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import Papa from 'papaparse';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 import { MetricasComponent } from '../components/metricas/metricas.component';
 import { ResumenComponent } from '../components/resumen/resumen.component';
 import { RegistrosComponent, Registro } from '../components/registros/registros.component';
+import { PdfComponent } from '../components/pdf/pdf.component';
+import { IonCardSubtitle, IonButton } from '@ionic/angular/standalone';
+
 
 type Metrics = {
   totalCamaras: number;
@@ -28,17 +29,19 @@ type Metrics = {
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
-    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+    IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
+    IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonItem, IonLabel, IonSelect, IonSelectOption, IonNote, IonChip, IonIcon,
     MetricasComponent,
     ResumenComponent,
-    RegistrosComponent
+    RegistrosComponent,
+    PdfComponent,IonCardSubtitle,
+IonButton,
   ]
 })
 export class HomePage implements OnDestroy {
+  
 
-   private safeBreaksCss: number[] = []; // en px de CSS del DOM CLONADO
   fileName = '';
   parsed = false;
 
@@ -295,262 +298,5 @@ export class HomePage implements OnDestroy {
     this.metrics = m;
   }
 
-// Reemplaza exportPDF() por esta versión de exportación a imagen
-private nextFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
-
-async exportImage(format: 'png' | 'jpeg' = 'png', quality = 0.92) {
-  const element = document.getElementById('reportArea');
-  if (!element) return;
-
-  try {
-    await this.nextFrame();
-
-    const canvas = await html2canvas(element, {
-      scale: window.devicePixelRatio || 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      onclone: (clonedDoc) => {
-        clonedDoc.body.classList.add('exporting');
-        // Limpieza de estilos que rompen el render
-        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
-        clonedDoc.querySelectorAll('style').forEach(n => n.remove());
-
-        const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
-        clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
-          const inl = el.getAttribute('style') || '';
-          if (BAD_PAT.test(inl)) el.removeAttribute('style');
-          (el as HTMLElement).style.setProperty('--background', '#ffffff');
-          (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
-        });
-
-        const safe = clonedDoc.createElement('style');
-        safe.textContent = `
-          * {
-            background: #ffffff !important;
-            background-image: none !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-            border-color: #e5e7eb !important;
-            color: #111827 !important;
-          }
-          body, ion-content { --background: #ffffff !important; }
-          #reportArea, ion-card, .resumen p, .resumen ul, .resumen ul li, .table-responsive {
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-          }
-        `;
-        clonedDoc.head.appendChild(safe);
-      },
-    });
-
-    // Genera el blob de imagen
-    const mime = format === 'png' ? 'image/png' : 'image/jpeg';
-    const dataUrl = canvas.toDataURL(mime, quality);
-
-    // Dispara la descarga
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = this.suggestedImageName(format);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-  } catch (err) {
-    console.error('Error al exportar imagen:', err);
-    alert('No se pudo exportar la imagen. Intenta nuevamente.');
-  }
-}
-
-private suggestedImageName(format: 'png' | 'jpeg'): string {
-  const today = new Date();
-  const fmt = (n: number) => String(n).padStart(2, '0');
-  const fecha = `${today.getFullYear()}-${fmt(today.getMonth() + 1)}-${fmt(today.getDate())}`;
-  const ub = this.filters.ubicacion || 'Todas';
-  const ext = format === 'png' ? 'png' : 'jpg';
-  return `Reporte_Camaras_${ub}_${fecha}.${ext}`;
-}
-
   ngOnDestroy(): void {}
-
-async exportPDF() {
-  const container = document.getElementById('reportArea');
-  if (!container) return;
-
-  try {
-    await this.nextFrame();
-
-    let clonedContainerWidth = 0; // ancho CSS del contenedor clonado (para escalar a canvas)
-
-    const canvas = await html2canvas(container, {
-      scale: window.devicePixelRatio || 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      // ayuda a que el tamaño del DOM clonado coincida con el layout real
-      windowWidth: container.scrollWidth,
-      onclone: (clonedDoc) => {
-        clonedDoc.body.classList.add('exporting');
-
-        // Limpieza de estilos problemáticos
-        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(n => n.remove());
-        clonedDoc.querySelectorAll('style').forEach(n => n.remove());
-        const BAD_PAT = /(oklch|color-mix|conic-gradient|radial-gradient|linear-gradient)/i;
-        clonedDoc.querySelectorAll<HTMLElement>('*').forEach(el => {
-          const inl = el.getAttribute('style') || '';
-          if (BAD_PAT.test(inl)) el.removeAttribute('style');
-          (el as HTMLElement).style.setProperty('--background', '#ffffff');
-          (el as HTMLElement).style.setProperty('background', '#ffffff', 'important');
-        });
-
-        const safe = clonedDoc.createElement('style');
-        safe.textContent = `
-          * {
-            background:#fff !important; background-image:none !important;
-            box-shadow:none !important; text-shadow:none !important;
-            border-color:#e5e7eb !important; color:#111827 !important;
-          }
-          body, ion-content { --background:#fff !important; }
-          #reportArea, ion-card, .resumen p, .resumen ul, .resumen li, .table-responsive {
-            background:#fff !important; border:1px solid #e5e7eb !important;
-          }
-        `;
-        clonedDoc.head.appendChild(safe);
-
-        // ==== Calcular cortes seguros en el DOM CLONADO ====
-        const clonedContainer = clonedDoc.getElementById('reportArea') as HTMLElement | null;
-        this.safeBreaksCss = [];
-        if (clonedContainer) {
-          clonedContainerWidth = clonedContainer.clientWidth;
-
-          const containerRect = clonedContainer.getBoundingClientRect();
-          const getBottom = (el: Element) => {
-            const r = (el as HTMLElement).getBoundingClientRect();
-            // px CSS relativos al inicio de #reportArea clonado
-            return (r.bottom - containerRect.top);
-          };
-
-          // Selectores ampliados: resumen (4) y registros (5)
-          const selectors = [
-            '#reportArea > ion-card',
-            'ion-card',
-            '.no-split',
-
-            // Punto 4) Resumen
-            'app-resumen',
-            'app-resumen ion-card',
-            'app-resumen li',
-
-            // Punto 5) Registros
-            'app-registros',
-            'app-registros ion-card',
-            'app-registros .registro',
-            'app-registros .registro-card',
-            'app-registros .registro-item',
-            'app-registros li'
-          ];
-
-          const candidates = Array
-            .from(clonedContainer.querySelectorAll(selectors.join(',')))
-            .map(getBottom)
-            .filter(y => y > 0)
-            .sort((a, b) => a - b);
-
-          // De-dup por cercanía
-          const MIN_GAP = 24; // px
-          for (const y of candidates) {
-            if (!this.safeBreaksCss.length ||
-                Math.abs(y - this.safeBreaksCss[this.safeBreaksCss.length - 1]) > MIN_GAP) {
-              this.safeBreaksCss.push(Math.round(y));
-            }
-          }
-        }
-        // ================================================
-      },
-    });
-
-    // ==== Convertir cortes CSS -> píxeles del canvas ====
-    const scaleFactor = clonedContainerWidth ? (canvas.width / clonedContainerWidth) : 1;
-    const uniqueBreaks = this.safeBreaksCss.map(y => Math.round(y * scaleFactor));
-
-    // ===== PDF base (márgenes más anchos)
-    const autoOrientation: 'p' | 'l' = canvas.width >= canvas.height ? 'l' : 'p';
-    const pdf = new jsPDF({ orientation: autoOrientation, unit: 'mm', format: 'a4' });
-
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const marginMM = 20; // <<< márgenes más anchos
-    const usableWmm = pageW - marginMM * 2;
-    const imgWmm = usableWmm;
-    const imgHmm = (canvas.height * imgWmm) / canvas.width;
-
-    // Relación px del canvas por mm impresos
-    const pxPerMM = canvas.height / imgHmm;
-    const usableHPx = (pageH - marginMM * 2) * pxPerMM;
-
-    // ===== Slicing SIN cortar elementos
-    const slices: Array<{ y: number; h: number; }> = [];
-    let y = 0;
-    const TOLERANCE = 32;   // tolerancia si no hay corte seguro cercano
-    const MIN_SLICE = 120;  // evita páginas casi vacías
-    const SLICE_PADDING = 12; // colchón para que no quede mordido en el borde
-
-    while (y < canvas.height) {
-      const target = y + usableHPx;
-      const candidatesInWindow = uniqueBreaks.filter(b => b <= target && b >= y + MIN_SLICE);
-      let end = candidatesInWindow.length ? candidatesInWindow[candidatesInWindow.length - 1] : target;
-
-      // Aplica colchón cuando usamos corte seguro
-      if (candidatesInWindow.length) {
-        end = Math.max(y + MIN_SLICE, end - SLICE_PADDING);
-      }
-
-      // Si el corte seguro queda demasiado arriba, usa target
-      if ((target - end) > TOLERANCE) end = target;
-
-      // Límites y guardas
-      if (end > canvas.height) end = canvas.height;
-      if (end <= y) end = Math.min(canvas.height, y + usableHPx);
-
-      slices.push({ y, h: Math.max(1, Math.round(end - y)) });
-      y = end;
-    }
-
-    // === Pintar cada slice en el PDF
-    const tmp = document.createElement('canvas');
-    const tctx = tmp.getContext('2d')!;
-
-    for (let i = 0; i < slices.length; i++) {
-      const { y: sy, h: sh } = slices[i];
-
-      tmp.width = canvas.width;
-      tmp.height = sh;
-      tctx.clearRect(0, 0, tmp.width, tmp.height);
-      tctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, tmp.width, sh);
-
-      const sliceHmm = sh / pxPerMM; // alto en mm
-      const data = tmp.toDataURL('image/png', 1);
-
-      if (i > 0) pdf.addPage();
-      pdf.addImage(data, 'PNG', marginMM, marginMM, imgWmm, sliceHmm, undefined, 'FAST');
-    }
-
-    pdf.save(this.suggestedPdfName());
-  } catch (err) {
-    console.error('Error al exportar PDF:', err);
-    alert('No se pudo exportar el PDF. Intenta nuevamente.');
-  }
-}
-
-
-private suggestedPdfName(): string {
-  const today = new Date();
-  const fmt = (n: number) => String(n).padStart(2, '0');
-  const fecha = `${today.getFullYear()}-${fmt(today.getMonth() + 1)}-${fmt(today.getDate())}`;
-  const ub = this.filters.ubicacion || 'Todas';
-  return `Reporte_Camaras_${ub}_${fecha}.pdf`;
-}
-
 }

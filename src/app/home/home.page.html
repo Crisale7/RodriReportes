@@ -2,15 +2,8 @@
   <ion-toolbar>
     <ion-title>Reporte de Monitoreo de Cámaras</ion-title>
     <ion-buttons slot="end">
-      <!-- antes: (click)="exportPDF()" -->
-<ion-button color="primary" (click)="exportImage()" [disabled]="!parsed">
-  <ion-icon name="image-outline" slot="start"></ion-icon>
-  Exportar imagen
-</ion-button>
-<ion-button color="tertiary" (click)="exportPDF()" [disabled]="!parsed">
-    <ion-icon name="document-outline" slot="start"></ion-icon>
-    Exportar PDF
-  </ion-button>
+      <!-- Nuevo componente PDF -->
+      <app-pdf [disabled]="!parsed"></app-pdf>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>

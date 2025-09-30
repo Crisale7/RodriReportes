@@ -18,7 +18,7 @@ export type Registro = {
   operativasHoy: string;
   malaCalidad?: string;
   camsConFalla: number;
-  detalleFallas?: string;
+  detalleFallas?: string;   // 👈 ya incluido
   fallaTipo?: string;
   fallasGenerales?: string;
   observaciones?: string;
@@ -39,4 +39,15 @@ export type Registro = {
 })
 export class RegistrosComponent {
   @Input() filtered: Registro[] = [];
+
+  splitDetalle(texto: string): string[] {
+  if (!texto) return [];
+
+  // Normalizamos separadores: saltos de línea, punto y coma o simplemente "Cámara:"
+  return texto
+    .split(/Cámara:/i)              // partimos por la palabra "Cámara:"
+    .map(t => t.trim())             // limpiamos espacios
+    .filter(t => t.length > 0)      // eliminamos vacíos
+    .map(t => `Cámara: ${t}`);      // le volvemos a poner el prefijo
+}
 }

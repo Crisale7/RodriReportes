@@ -1,0 +1,12 @@
+.pdf-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+
+  ion-button {
+    --border-radius: 12px;
+    font-weight: 700;
+  }
+}
